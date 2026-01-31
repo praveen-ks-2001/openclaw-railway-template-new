@@ -1,0 +1,19 @@
+# Node
+node_modules
+npm-debug.log*
+
+# Local env
+.env
+
+# Build artifacts
+/dist
+
+# Backup exports
+*.tar.gz
+
+# OS
+.DS_Store
+
+.claude/
+.serena/
+.tmpdata/

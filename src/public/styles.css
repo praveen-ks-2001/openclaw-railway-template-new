@@ -1,0 +1,111 @@
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  margin: 2rem;
+  max-width: 900px;
+  background: #050810;
+  color: #f0f4ff;
+}
+
+.card {
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin: 1rem 0;
+  background: #111827;
+}
+
+label {
+  display: block;
+  margin-top: 0.75rem;
+  font-weight: 600;
+  color: #f0f4ff;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 0.6rem;
+  margin-top: 0.25rem;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  color: #f0f4ff;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #ff4d4d;
+}
+
+button {
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  border: 0;
+  background: #ff4d4d;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #e63946;
+}
+
+.secondary-button {
+  background: #1f2937;
+  margin-left: 0.5rem;
+}
+
+.secondary-button:hover {
+  background: #374151;
+}
+
+.tertiary-button {
+  background: #374151;
+  margin-left: 0.5rem;
+}
+
+.tertiary-button:hover {
+  background: #4b5563;
+}
+
+code {
+  background: #1f2937;
+  color: #00e5cc;
+  padding: 0.1rem 0.3rem;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+pre {
+  white-space: pre-wrap;
+  background: #0d1117;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  color: #8892b0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+}
+
+a {
+  color: #00e5cc;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: #ff4d4d;
+}
+
+.muted {
+  color: #8892b0;
+}
+
+h1, h2, h3 {
+  color: #f0f4ff;
+}
