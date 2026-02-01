@@ -1,18 +1,20 @@
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-  margin: 2rem auto;
-  padding: 0 1rem;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
   max-width: 1100px;
-  background: #050810;
-  color: #f0f4ff;
+  background: #0f1218;
+  color: #c9d1d9;
+  line-height: 1.5;
 }
 
 .card {
-  border: 1px solid #1f2937;
+  border: 1px solid #2d3b4f;
   border-radius: 12px;
-  padding: 1.25rem;
-  margin: 1rem 0;
-  background: #111827;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  background: #18202f;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 label {
@@ -25,12 +27,14 @@ label {
 input,
 select {
   width: 100%;
-  padding: 0.6rem;
-  margin-top: 0.25rem;
-  background: #1f2937;
-  border: 1px solid #374151;
+  padding: 0.75rem;
+  margin-top: 0.35rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
   border-radius: 8px;
-  color: #f0f4ff;
+  color: #f0f6fc;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  font-size: 0.95rem;
 }
 
 input:focus,
@@ -40,18 +44,20 @@ select:focus {
 }
 
 button {
-  padding: 0.8rem 1.2rem;
-  border-radius: 10px;
+  padding: 0.8rem 1.4rem;
+  border-radius: 8px;
   border: 0;
-  background: #ff4d4d;
+  background: linear-gradient(145deg, #ff4d4d, #d93d3d);
   color: #fff;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s;
 }
 
 button:hover {
-  background: #e63946;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 77, 77, 0.3);
+  filter: brightness(1.1);
 }
 
 .secondary-button {
@@ -109,6 +115,22 @@ a:hover {
   color: #8892b0;
 }
 
-h1, h2, h3 {
-  color: #f0f4ff;
+h1,
+h2,
+h3 {
+  color: #f0f6fc;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #2d3b4f;
+  padding-bottom: 0.5rem;
 }
