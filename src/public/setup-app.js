@@ -91,7 +91,6 @@
       flow: document.getElementById('flow').value,
       authChoice: authChoiceEl.value,
       authSecret: document.getElementById('authSecret').value,
-      model: document.getElementById('model').value,
       telegramToken: document.getElementById('telegramToken').value,
       discordToken: document.getElementById('discordToken').value,
       slackBotToken: document.getElementById('slackBotToken').value,
