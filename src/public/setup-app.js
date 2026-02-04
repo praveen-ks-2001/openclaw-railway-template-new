@@ -1,11 +1,22 @@
 // Served at /setup/app.js
-// No fancy syntax: keep it maximally compatible.
+// Modern setup wizard logic
 
 (function () {
+  // Elements
   var statusEl = document.getElementById('status');
+  var statusDotEl = document.getElementById('statusDot');
   var authGroupEl = document.getElementById('authGroup');
   var authChoiceEl = document.getElementById('authChoice');
   var logEl = document.getElementById('log');
+  var loadingOverlay = document.getElementById('loadingOverlay');
+
+  // Summary elements
+  var summaryProvider = document.getElementById('summaryProvider');
+  var summaryAuth = document.getElementById('summaryAuth');
+  var summaryKey = document.getElementById('summaryKey');
+  var summaryTelegram = document.getElementById('summaryTelegram');
+  var summaryDiscord = document.getElementById('summaryDiscord');
+  var summarySlack = document.getElementById('summarySlack');
 
   // Debug console
   var consoleCmdEl = document.getElementById('consoleCmd');
@@ -20,12 +31,40 @@
   var configSaveEl = document.getElementById('configSave');
   var configOutEl = document.getElementById('configOut');
 
-  // UI Links
-  var topUiLink = document.getElementById('topUiLink');
-  var bottomUiLink = document.getElementById('bottomUiLink');
+  // UI Link
+  var openUiLink = document.getElementById('openUiLink');
 
-  function setStatus(s) {
-    statusEl.textContent = s;
+  // Input elements for summary
+  var authSecretEl = document.getElementById('authSecret');
+  var telegramTokenEl = document.getElementById('telegramToken');
+  var discordTokenEl = document.getElementById('discordToken');
+  var slackBotTokenEl = document.getElementById('slackBotToken');
+  var slackAppTokenEl = document.getElementById('slackAppToken');
+
+  function setStatus(text, state) {
+    statusEl.textContent = text;
+    statusDotEl.className = 'status-dot';
+    if (state === 'ready') statusDotEl.classList.add('ready');
+    else if (state === 'error') statusDotEl.classList.add('error');
+  }
+
+  function maskToken(token) {
+    if (!token || token.length < 8) return token ? '••••••••' : '—';
+    return token.slice(0, 4) + '••••' + token.slice(-4);
+  }
+
+  function updateSummary() {
+    var providerText = authGroupEl.options[authGroupEl.selectedIndex]?.text || '—';
+    var authText = authChoiceEl.options[authChoiceEl.selectedIndex]?.text || '—';
+
+    summaryProvider.textContent = providerText.split(' - ')[0];
+    summaryAuth.textContent = authText.split(' - ')[0];
+    summaryKey.textContent = maskToken(authSecretEl.value);
+    summaryTelegram.textContent = maskToken(telegramTokenEl.value);
+    summaryDiscord.textContent = maskToken(discordTokenEl.value);
+
+    var slack = slackBotTokenEl.value || slackAppTokenEl.value;
+    summarySlack.textContent = maskToken(slack);
   }
 
   function renderAuth(groups) {
@@ -34,7 +73,7 @@
       var g = groups[i];
       var opt = document.createElement('option');
       opt.value = g.value;
-      opt.textContent = g.label + (g.hint ? ' - ' + g.hint : '');
+      opt.textContent = g.label + (g.hint ? ' — ' + g.hint : '');
       authGroupEl.appendChild(opt);
     }
 
@@ -49,11 +88,13 @@
         var o = opts[k];
         var opt2 = document.createElement('option');
         opt2.value = o.value;
-        opt2.textContent = o.label + (o.hint ? ' - ' + o.hint : '');
+        opt2.textContent = o.label + (o.hint ? ' — ' + o.hint : '');
         authChoiceEl.appendChild(opt2);
       }
+      updateSummary();
     };
 
+    authChoiceEl.onchange = updateSummary;
     authGroupEl.onchange();
   }
 
@@ -70,45 +111,63 @@
     });
   }
 
+  function showLoading(show) {
+    if (show) {
+      loadingOverlay.classList.add('active');
+    } else {
+      loadingOverlay.classList.remove('active');
+    }
+  }
+
   function refreshStatus() {
-    setStatus('Loading... Engine is starting up, please wait 15-20s...');
+    setStatus('Starting engine... (15-20s)', 'loading');
     return httpJson('/setup/api/status').then(function (j) {
-      var ver = j.openclawVersion ? (' | ' + j.openclawVersion) : '';
-      setStatus((j.configured ? 'Configured - open /openclaw' : 'Not configured - run setup below') + ver);
+      var ver = j.openclawVersion ? (' • v' + j.openclawVersion) : '';
+      if (j.configured) {
+        setStatus('Configured' + ver, 'ready');
+      } else {
+        setStatus('Ready for setup' + ver, 'ready');
+      }
       renderAuth(j.authGroups || []);
 
-      if (j.gatewayToken) {
-        var tokenUrl = '/openclaw?token=' + encodeURIComponent(j.gatewayToken);
-        if (topUiLink) topUiLink.href = tokenUrl;
-        if (bottomUiLink) bottomUiLink.href = tokenUrl;
+      // Update UI link with token
+      if (j.gatewayToken && openUiLink) {
+        openUiLink.href = '/openclaw?token=' + encodeURIComponent(j.gatewayToken);
       }
 
       if (j.channelsAddHelp && j.channelsAddHelp.indexOf('telegram') === -1) {
-        logEl.textContent += '\nNote: this openclaw build does not list telegram in `channels add --help`. Telegram auto-add will be skipped.\n';
+        logEl.textContent += 'Note: Telegram not available in this build.\n';
       }
 
-      // Attempt to load config editor content if present.
+      // Load config editor
       if (configReloadEl && configTextEl) {
         loadConfigRaw();
       }
 
     }).catch(function (e) {
-      setStatus('Error: ' + String(e));
+      setStatus('Error: ' + String(e), 'error');
     });
   }
 
+  // Listen for input changes to update summary
+  [authSecretEl, telegramTokenEl, discordTokenEl, slackBotTokenEl, slackAppTokenEl].forEach(function (el) {
+    if (el) el.addEventListener('input', updateSummary);
+  });
+
+  // Run setup
   document.getElementById('run').onclick = function () {
     var payload = {
       flow: document.getElementById('flow').value,
       authChoice: authChoiceEl.value,
-      authSecret: document.getElementById('authSecret').value,
-      telegramToken: document.getElementById('telegramToken').value,
-      discordToken: document.getElementById('discordToken').value,
-      slackBotToken: document.getElementById('slackBotToken').value,
-      slackAppToken: document.getElementById('slackAppToken').value
+      authSecret: authSecretEl.value,
+      telegramToken: telegramTokenEl.value,
+      discordToken: discordTokenEl.value,
+      slackBotToken: slackBotTokenEl.value,
+      slackAppToken: slackAppTokenEl.value
     };
 
-    logEl.textContent = 'Running setup... This may take up to 30 seconds...\n';
+    logEl.textContent = 'Starting setup...\n';
+    showLoading(true);
 
     fetch('/setup/api/run', {
       method: 'POST',
@@ -124,10 +183,12 @@
       return refreshStatus();
     }).catch(function (e) {
       logEl.textContent += '\nError: ' + String(e) + '\n';
+    }).finally(function () {
+      showLoading(false);
     });
   };
 
-  // Pairing approve helper
+  // Pairing approve
   var pairingBtn = document.getElementById('pairingApprove');
   if (pairingBtn) {
     pairingBtn.onclick = function () {
@@ -152,8 +213,9 @@
     };
   }
 
+  // Reset
   document.getElementById('reset').onclick = function () {
-    if (!confirm('Reset setup? This deletes the config file so onboarding can run again.')) return;
+    if (!confirm('Reset setup? This deletes the config so you can start over.')) return;
     logEl.textContent = 'Resetting...\n';
     fetch('/setup/api/reset', { method: 'POST', credentials: 'same-origin' })
       .then(function (res) { return res.text(); })
@@ -161,9 +223,7 @@
       .catch(function (e) { logEl.textContent += 'Error: ' + String(e) + '\n'; });
   };
 
-  refreshStatus();
-
-  // Debug console runner
+  // Debug console
   function runConsole() {
     if (!consoleCmdEl || !consoleRunEl) return;
     var cmd = consoleCmdEl.value;
@@ -186,30 +246,30 @@
     consoleRunEl.onclick = runConsole;
   }
 
-  // Config raw load/save
+  // Config editor
   function loadConfigRaw() {
     if (!configTextEl) return;
     if (configOutEl) configOutEl.textContent = '';
     return httpJson('/setup/api/config/raw').then(function (j) {
       if (configPathEl) {
-        configPathEl.textContent = 'Config file: ' + (j.path || '(unknown)') + (j.exists ? '' : ' (does not exist yet)');
+        configPathEl.textContent = (j.path || '(unknown)') + (j.exists ? '' : ' (not created yet)');
       }
       configTextEl.value = j.content || '';
     }).catch(function (e) {
-      if (configOutEl) configOutEl.textContent = 'Error loading config: ' + String(e);
+      if (configOutEl) configOutEl.textContent = 'Error: ' + String(e);
     });
   }
 
   function saveConfigRaw() {
     if (!configTextEl) return;
-    if (!confirm('Save config and restart gateway? A timestamped .bak backup will be created.')) return;
+    if (!confirm('Save config and restart gateway?')) return;
     if (configOutEl) configOutEl.textContent = 'Saving...\n';
     return httpJson('/setup/api/config/raw', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ content: configTextEl.value })
     }).then(function (j) {
-      if (configOutEl) configOutEl.textContent = 'Saved: ' + (j.path || '') + '\nGateway restarted.\n';
+      if (configOutEl) configOutEl.textContent = 'Saved. Gateway restarted.\n';
       return refreshStatus();
     }).catch(function (e) {
       if (configOutEl) configOutEl.textContent += '\nError: ' + String(e) + '\n';
@@ -218,5 +278,8 @@
 
   if (configReloadEl) configReloadEl.onclick = loadConfigRaw;
   if (configSaveEl) configSaveEl.onclick = saveConfigRaw;
+
+  // Initialize
+  refreshStatus();
 
 })();
