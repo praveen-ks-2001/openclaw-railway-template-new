@@ -8,7 +8,7 @@
   var authGroupEl = document.getElementById('authGroup');
   var authChoiceEl = document.getElementById('authChoice');
   var logEl = document.getElementById('log');
-  var loadingOverlay = document.getElementById('loadingOverlay');
+  var inlineLoader = document.getElementById('inlineLoader'); // Changed from overlay
 
   // Summary elements
   var summaryProvider = document.getElementById('summaryProvider');
@@ -112,10 +112,11 @@
   }
 
   function showLoading(show) {
-    if (show) {
-      loadingOverlay.classList.add('active');
-    } else {
-      loadingOverlay.classList.remove('active');
+    if (show && inlineLoader) {
+      inlineLoader.classList.add('active');
+      inlineLoader.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (inlineLoader) {
+      inlineLoader.classList.remove('active');
     }
   }
 

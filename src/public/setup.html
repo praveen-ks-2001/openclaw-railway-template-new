@@ -9,12 +9,7 @@
 </head>
 
 <body>
-  <!-- Loading Overlay -->
-  <div id="loadingOverlay" class="loading-overlay">
-    <div class="loading-spinner"></div>
-    <div class="loading-text">Setting up OpenClaw...</div>
-    <div class="loading-subtext">This may take up to 30 seconds. Please wait.</div>
-  </div>
+  <!-- Loading Overlay Removed -->
 
   <div class="app-container">
     <!-- Header -->
@@ -154,7 +149,8 @@
           <label>Telegram Bot Token</label>
           <input id="telegramToken" type="password" placeholder="123456:ABC..." />
           <p class="hint">Get from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> →
-            <code>/newbot</code></p>
+            <code>/newbot</code>
+          </p>
 
           <label>Discord Bot Token</label>
           <input id="discordToken" type="password" placeholder="Bot token from Discord Developer Portal" />
@@ -211,11 +207,20 @@
               </svg>
               Run Setup
             </button>
-            <a id="openUiLink" href="/openclaw" target="_blank" class="btn-primary" style="text-decoration: none;">
+            <a id="openUiLink" href="/openclaw" target="_blank" class="btn btn-primary">
               Open OpenClaw UI
             </a>
             <button id="pairingApprove" class="btn-secondary">Approve Pairing</button>
             <button id="reset" class="btn-outline">Reset</button>
+          </div>
+
+          <!-- Inline Loader -->
+          <div id="inlineLoader" class="inline-loader">
+            <div class="loader-spinner"></div>
+            <div class="loader-content">
+              <span class="loader-title">Setting up OpenClaw...</span>
+              <span class="loader-desc">This may take up to 30 seconds. Please wait.</span>
+            </div>
           </div>
 
           <!-- Log Output -->

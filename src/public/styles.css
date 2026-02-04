@@ -362,7 +362,11 @@ select {
 }
 
 /* Buttons */
-button {
+.btn,
+button,
+a.btn-primary,
+a.btn-secondary,
+a.btn-outline {
   padding: 0.875rem 1.5rem;
   border-radius: 10px;
   border: none;
@@ -373,18 +377,25 @@ button {
   transition: all 0.2s;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
+  text-decoration: none;
+  line-height: normal;
 }
 
 .btn-primary {
   background: var(--accent-gradient);
-  color: white;
+  color: white !important;
+  /* Force color for links */
   box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+  border: none;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  color: white;
+  text-decoration: none;
 }
 
 .btn-primary:disabled {
@@ -402,6 +413,8 @@ button {
 .btn-secondary:hover {
   background: var(--bg-card-hover);
   border-color: var(--text-muted);
+  color: var(--text-primary);
+  text-decoration: none;
 }
 
 .btn-outline {
@@ -412,26 +425,70 @@ button {
 
 .btn-outline:hover {
   background: rgba(239, 68, 68, 0.1);
-}
-
-.btn-link {
-  background: none;
-  border: none;
-  padding: 0.5rem 1rem;
   color: var(--accent-primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.btn-link:hover {
-  color: var(--accent-secondary);
+  text-decoration: none;
 }
 
 .button-group {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
   margin-top: 1.5rem;
+}
+
+/* Inline Loader */
+.inline-loader {
+  background: rgba(16, 185, 129, 0.1);
+  /* Subtle green/theme tint */
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  visibility: hidden;
+}
+
+.inline-loader.active {
+  opacity: 1;
+  height: auto;
+  visibility: visible;
+  padding: 1rem;
+  margin-top: 1.5rem;
+}
+
+.loader-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(239, 68, 68, 0.2);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+.loader-content {
+  flex: 1;
+}
+
+.loader-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  display: block;
+}
+
+.loader-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  display: block;
 }
 
 /* Summary Box */
