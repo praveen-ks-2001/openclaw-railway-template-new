@@ -4,6 +4,7 @@ npm-debug.log*
 
 # Local env
 .env
+src_ref
 
 # Build artifacts
 /dist

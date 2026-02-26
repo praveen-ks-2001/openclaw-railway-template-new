@@ -31,9 +31,7 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-    .step-dot { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-    .step-dot-active { background: var(--color-accent); color: #fff; }
-    .step-dot-default { background: var(--color-surface-overlay); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+    .step-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; background: var(--color-surface-overlay); color: var(--color-text-muted); border: 1px solid var(--color-border); }
     .card { background: var(--color-surface-raised); border: 1px solid var(--color-border-muted); border-radius: 12px; padding: 24px; }
     .input-field { width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 14px; font-size: 14px; color: var(--color-text-primary); outline: none; transition: border-color 0.2s; }
     .input-field::placeholder { color: var(--color-text-muted); }
@@ -50,7 +48,10 @@
     .btn-success { background: #238636; color: #fff; }
     .btn-success:hover:not(:disabled) { background: #2ea043; }
     .section-number { width: 32px; height: 32px; border-radius: 50%; background: var(--color-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0; }
-    .log-box { background: var(--color-surface); border: 1px solid var(--color-border-muted); border-radius: 8px; padding: 16px; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace; font-size: 12px; color: var(--color-text-secondary); white-space: pre-wrap; max-height: 240px; overflow-y: auto; }
+    .log-box { background: var(--color-surface); border: 1px solid var(--color-border-muted); border-radius: 8px; padding: 16px; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace; font-size: 12px; color: var(--color-text-secondary); white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+    .info-tooltip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--color-surface-overlay); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 10px; font-weight: 700; cursor: help; flex-shrink: 0; }
+    .info-tooltip:hover .info-tooltip-content { display: block; }
+    .info-tooltip-content { display: none; position: absolute; left: 24px; top: -8px; width: 240px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; font-size: 12px; font-weight: 400; color: var(--color-text-secondary); line-height: 1.5; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
   </style>
   <script>
     document.addEventListener('alpine:init', () => {
@@ -383,96 +384,101 @@
 </head>
 
 <body class="text-[var(--color-text-primary)] min-h-screen font-sans" x-data="setupApp()">
-  <div class="flex min-h-screen">
 
-    <!-- LEFT SIDEBAR -->
-    <aside
-      class="w-72 shrink-0 border-r border-[var(--color-border-muted)] bg-[var(--color-surface-raised)] sticky top-0 h-screen overflow-y-auto hidden lg:flex flex-col">
-      <div class="p-6 pb-4 border-b border-[var(--color-border-muted)]">
-        <img src="https://res.cloudinary.com/asset-cloudinary/image/upload/v1769907898/openclaw-logo-text_w3qcgl.avif"
-          alt="OpenClaw" class="h-8">
-        <p class="text-xs text-[var(--color-text-muted)] mt-2">Setup Wizard</p>
-      </div>
-      <nav class="flex-1 p-6">
-        <p class="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-semibold mb-5">How to Setup
-        </p>
-        <ol class="space-y-5">
-          <li class="flex items-start gap-3">
-            <span class="step-dot step-dot-active">1</span>
-            <div>
-              <p class="text-sm font-medium text-[var(--color-text-primary)]">Wait for engine</p>
-              <p class="text-xs text-[var(--color-text-muted)] mt-0.5">Takes ~15-20s to initialize</p>
-            </div>
-          </li>
-          <li class="flex items-start gap-3">
-            <span class="step-dot step-dot-default">2</span>
-            <div>
-              <p class="text-sm font-medium text-[var(--color-text-secondary)]">Select provider</p>
-              <p class="text-xs text-[var(--color-text-muted)] mt-0.5">Choose AI provider & paste API key</p>
-            </div>
-          </li>
-          <li class="flex items-start gap-3">
-            <span class="step-dot step-dot-default">3</span>
-            <div>
-              <p class="text-sm font-medium text-[var(--color-text-secondary)]">Add channels</p>
-              <p class="text-xs text-[var(--color-text-muted)] mt-0.5">Connect Telegram, Discord, or Slack</p>
-            </div>
-          </li>
-          <li class="flex items-start gap-3">
-            <span class="step-dot step-dot-default">4</span>
-            <div>
-              <p class="text-sm font-medium text-[var(--color-text-secondary)]">Run setup</p>
-              <p class="text-xs text-[var(--color-text-muted)] mt-0.5">Takes ~30s to configure</p>
-            </div>
-          </li>
-          <li class="flex items-start gap-3">
-            <span class="step-dot step-dot-default">5</span>
-            <div>
-              <p class="text-sm font-medium text-[var(--color-text-secondary)]">Approve pairing</p>
-              <p class="text-xs text-[var(--color-text-muted)] mt-0.5">Only if you added channel tokens</p>
-            </div>
-          </li>
-          <li class="flex items-start gap-3">
-            <span class="step-dot step-dot-default">6</span>
-            <div>
-              <p class="text-sm font-medium text-[var(--color-text-secondary)]">Open UI</p>
-              <p class="text-xs text-[var(--color-text-muted)] mt-0.5">Start using OpenClaw!</p>
-            </div>
-          </li>
-        </ol>
-      </nav>
-      <div class="p-6 pt-0">
-        <div class="text-xs text-[var(--color-text-muted)]">
-          <span x-show="openclawVersion" x-text="'v' + openclawVersion"></span>
+  <!-- STICKY TOP BAR -->
+  <header
+    class="fixed top-0 left-0 right-0 z-30 bg-[var(--color-surface)]/90 backdrop-blur-md border-b border-[var(--color-border-muted)] px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="https://res.cloudinary.com/asset-cloudinary/image/upload/v1769907898/openclaw-logo-text_w3qcgl.avif"
+        alt="OpenClaw" class="h-7">
+      <span class="text-xs text-[var(--color-text-muted)]">Setup Wizard</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span x-show="configured"
+        class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-[#238636]/15 text-[var(--color-success)] border border-[#238636]/30">
+        <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]"></span> Configured
+      </span>
+      <span x-show="!configured && isReady"
+        class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-[var(--color-warning)]/15 text-[var(--color-warning)] border border-[var(--color-warning)]/30">
+        <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)]"></span> Not configured
+      </span>
+      <a x-show="tuiEnabled && configured" href="/tui" target="_blank"
+        class="btn btn-secondary text-xs !py-1.5 !px-3">Terminal</a>
+    </div>
+  </header>
+
+  <div class="flex pt-[52px] min-h-screen">
+
+    <!-- LEFT SIDEBAR - step guide -->
+    <div class="hidden lg:block w-96 shrink-0">
+      <div class="sticky top-[52px] p-6 pt-8">
+        <div class="card !p-5">
+          <p class="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-semibold mb-5">How to
+            Setup</p>
+          <ol class="space-y-4">
+            <li class="flex items-start gap-3">
+              <span class="step-num">1</span>
+              <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Select your <strong
+                  class="text-[var(--color-text-primary)]">provider & auth type</strong>, then paste your API key</p>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="step-num">2</span>
+              <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Add <strong
+                  class="text-[var(--color-text-primary)]">channels</strong> (optional — can be done later)</p>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="step-num">3</span>
+              <p class="text-[13px] text-[var(--color-text-primary)] leading-relaxed">Click <strong
+                  class="text-[var(--color-text-primary)]">Run Setup</strong></p>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="step-num">4</span>
+              <div class="flex items-start gap-1.5 relative">
+                <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">If you added a channel token,
+                  click <strong class="text-[var(--color-text-primary)]">Approve Pairing</strong> and enter the code</p>
+                <div class="info-tooltip mt-0.5">i
+                  <div class="info-tooltip-content" style="top: -10px; left: 24px; width: 260px;">After setup, message
+                    your bot on the channel (e.g. send "hey"). It
+                    will reply with a pairing code. Enter that code here to grant DM access. If no code appears, try
+                    restarting the bot.</div>
+                </div>
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="step-num">5</span>
+              <p class="text-[13px] text-[var(--color-text-primary)] leading-relaxed">Click <strong
+                  class="text-[var(--color-text-primary)]">Open OpenClaw UI</strong></p>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="step-num">6</span>
+              <div class="flex items-start gap-1.5 relative">
+                <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">First login? Click <strong
+                    class="text-[var(--color-text-primary)]">Manage Devices</strong> → <strong
+                    class="text-[var(--color-text-primary)]">Approve Latest Request</strong></p>
+                <div class="info-tooltip mt-0.5">i
+                  <div class="info-tooltip-content" style="top: -24px; left: 24px; width: 260px;">New browsers need a
+                    one-time device approval. After clicking "Open
+                    OpenClaw UI", come back here, click "Manage Devices", and approve the pending request.</div>
+                </div>
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="step-num">7</span>
+              <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">You should now see <strong
+                  class="text-[var(--color-text-primary)]">Health: OK</strong> in the OpenClaw UI</p>
+            </li>
+          </ol>
+        </div>
+
+        <div class="mt-4 px-2">
+          <span x-show="openclawVersion" x-text="'v' + openclawVersion"
+            class="text-xs text-[var(--color-text-muted)]"></span>
         </div>
       </div>
-    </aside>
+    </div>
 
-    <!-- RIGHT MAIN CONTENT -->
-    <main class="flex-1 overflow-y-auto">
-      <!-- Top bar -->
-      <header
-        class="sticky top-0 z-10 bg-[var(--color-surface)]/80 backdrop-blur-md border-b border-[var(--color-border-muted)] px-6 py-3 flex items-center justify-between">
-        <div class="lg:hidden">
-          <img src="https://res.cloudinary.com/asset-cloudinary/image/upload/v1769907898/openclaw-logo-text_w3qcgl.avif"
-            alt="OpenClaw" class="h-7">
-        </div>
-        <div class="hidden lg:block"></div>
-        <div class="flex items-center gap-3">
-          <span x-show="configured"
-            class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-[#238636]/15 text-[var(--color-success)] border border-[#238636]/30">
-            <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-success)]"></span> Configured
-          </span>
-          <span x-show="!configured && isReady"
-            class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-[var(--color-warning)]/15 text-[var(--color-warning)] border border-[var(--color-warning)]/30">
-            <span class="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)]"></span> Not configured
-          </span>
-          <a x-show="tuiEnabled && configured" href="/tui" target="_blank"
-            class="btn btn-secondary text-xs !py-1.5 !px-3">Terminal</a>
-        </div>
-      </header>
-
-      <div class="max-w-2xl mx-auto px-6 py-8 space-y-8">
+    <main class="flex-1 justify-center flex overflow-y-auto">
+      <div class="w-full max-w-4xl px-6 py-8 space-y-8">
 
         <!-- ===================== PRE-SETUP VIEW ===================== -->
         <template x-if="isReady && !configured">
@@ -532,9 +538,7 @@
               </div>
               <p class="text-sm text-[var(--color-text-secondary)] mb-6 ml-11">Connect messaging platforms. You can also
                 add these later from the OpenClaw UI.</p>
-
               <div class="space-y-5">
-                <!-- Telegram -->
                 <div>
                   <label
                     class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">Telegram
@@ -545,7 +549,6 @@
                       target="_blank" class="text-[var(--color-accent)] hover:underline">@BotFather</a> → <code
                       class="text-xs bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">/newbot</code></p>
                 </div>
-                <!-- Discord -->
                 <div>
                   <label
                     class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">Discord
@@ -556,7 +559,6 @@
                       class="text-[var(--color-warning)]">MESSAGE CONTENT INTENT</strong> in Bot → Privileged Gateway
                     Intents</p>
                 </div>
-                <!-- Slack -->
                 <div>
                   <label
                     class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">Slack
@@ -578,8 +580,6 @@
                 <span class="section-number">3</span>
                 <h2 class="text-lg font-semibold">Review & Run</h2>
               </div>
-
-              <!-- Summary Table -->
               <div class="bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-4 mb-6">
                 <p class="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-semibold mb-3">Your
                   Configuration</p>
@@ -611,8 +611,6 @@
                   </div>
                 </dl>
               </div>
-
-              <!-- Action Buttons -->
               <div class="flex flex-wrap items-center gap-3 mb-4">
                 <button @click="runSetup()" :disabled="loading" class="btn btn-primary">
                   <span x-show="!loading">▶ Run Setup</span>
@@ -626,7 +624,6 @@
                 </button>
                 <button @click="resetSetup()" :disabled="loading" class="btn btn-danger">Reset</button>
               </div>
-
               <div x-show="log" class="log-box" x-text="log"></div>
             </section>
           </div>
@@ -636,93 +633,100 @@
         <template x-if="isReady && configured">
           <div class="space-y-6">
 
-            <!-- Success + Open UI -->
-            <section class="card">
-              <div class="flex items-center gap-3 mb-3">
-                <div class="w-10 h-10 rounded-full bg-[#238636]/15 flex items-center justify-center">
-                  <svg class="w-5 h-5 text-[var(--color-success)]" fill="none" stroke="currentColor"
-                    viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 class="text-lg font-semibold">Setup Complete</h2>
-                  <p class="text-sm text-[var(--color-text-secondary)]">Your OpenClaw instance is configured and running
-                  </p>
-                </div>
-              </div>
-              <div class="flex gap-3 mt-4">
-                <a href="/openclaw" target="_blank" class="btn btn-success">
-                  Open OpenClaw UI
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              </div>
-            </section>
+            <!-- Two-column layout: left = maintenance + logs, right = actions -->
+            <div class="flex flex-col lg:flex-row gap-6">
 
-            <!-- Devices & Channel Access -->
-            <section class="card">
-              <h3 class="text-base font-semibold mb-1">Devices & Access</h3>
-              <p class="text-sm text-[var(--color-text-secondary)] mb-4">Manage devices and channel access</p>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button @click="openPairingModal()" :disabled="loading" class="btn btn-secondary w-full">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  Approve Channel Access
-                </button>
-                <button @click="openDevicesModal()" :disabled="loading" class="btn btn-secondary w-full">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Manage Devices
-                </button>
-              </div>
-            </section>
+              <!-- LEFT COLUMN: Maintenance + Logs -->
+              <div class="flex-1 space-y-6 min-w-0">
 
-            <!-- Maintenance -->
-            <section class="card">
-              <h3 class="text-base font-semibold mb-1">Maintenance</h3>
-              <p class="text-sm text-[var(--color-text-secondary)] mb-4">Health checks and data management</p>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <button @click="runDoctor()" :disabled="loading" class="btn btn-secondary w-full">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span x-show="!loading">Run Doctor</span>
-                  <span x-show="loading">Running...</span>
-                </button>
-                <button @click="exportData()" :disabled="loading || exporting" class="btn btn-secondary w-full">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  <span x-show="!exporting">Export Data</span>
-                  <span x-show="exporting">Exporting...</span>
-                </button>
-              </div>
-              <div x-show="log" class="log-box" x-text="log"></div>
-            </section>
+                <!-- Setup Complete Banner -->
+                <section class="card">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-[#238636]/15 flex items-center justify-center shrink-0">
+                      <svg class="w-5 h-5 text-[var(--color-success)]" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 class="text-lg font-semibold">Setup Complete</h2>
+                      <p class="text-sm text-[var(--color-text-secondary)]">Your OpenClaw instance is configured and
+                        running</p>
+                    </div>
+                  </div>
+                </section>
 
-            <!-- Danger Zone -->
-            <section class="card !border-[var(--color-danger)]/30">
-              <div class="flex items-center justify-between">
-                <div>
-                  <h3 class="text-base font-semibold text-[var(--color-danger)]">Danger Zone</h3>
-                  <p class="text-sm text-[var(--color-text-secondary)] mt-0.5">Deletes the config file so you can run
-                    onboarding again from scratch.</p>
-                </div>
-                <button @click="resetSetup()" :disabled="loading" class="btn btn-danger shrink-0 ml-4">Reset
-                  Setup</button>
+                <!-- Maintenance -->
+                <section class="card">
+                  <h3 class="text-base font-semibold mb-1">Maintenance</h3>
+                  <p class="text-sm text-[var(--color-text-secondary)] mb-4">Health checks and data management</p>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button @click="runDoctor()" :disabled="loading" class="btn btn-secondary w-full">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span x-show="!loading">Run Doctor</span>
+                      <span x-show="loading">Running...</span>
+                    </button>
+                    <button @click="exportData()" :disabled="loading || exporting" class="btn btn-secondary w-full">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      <span x-show="!exporting">Export Data</span>
+                      <span x-show="exporting">Exporting...</span>
+                    </button>
+                  </div>
+                </section>
+
+                <!-- Logs -->
+                <section class="card">
+                  <h3 class="text-base font-semibold mb-3">Logs</h3>
+                  <div class="log-box min-h-[200px]" x-text="log || 'No logs yet.'"></div>
+                </section>
               </div>
-            </section>
+
+              <!-- RIGHT COLUMN: Actions + Danger Zone -->
+              <div class="lg:w-72 shrink-0 space-y-6">
+
+                <!-- Primary Actions -->
+                <section class="card space-y-3">
+                  <a href="/openclaw" target="_blank" class="btn btn-success w-full">
+                    Open OpenClaw UI
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <button @click="openPairingModal()" :disabled="loading" class="btn btn-secondary w-full">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    Approve Channel Access
+                  </button>
+                  <button @click="openDevicesModal()" :disabled="loading" class="btn btn-secondary w-full">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Manage Devices
+                  </button>
+                </section>
+
+                <!-- Danger Zone -->
+                <section class="card !border-[var(--color-danger)]/30">
+                  <h3 class="text-sm font-semibold text-[var(--color-danger)] mb-2">Danger Zone</h3>
+                  <p class="text-xs text-[var(--color-text-secondary)] mb-3">Deletes the config file so you can run
+                    setup again from scratch.</p>
+                  <button @click="resetSetup()" :disabled="loading" class="btn btn-danger w-full text-sm">Reset
+                    Setup</button>
+                </section>
+              </div>
+            </div>
           </div>
         </template>
       </div>
@@ -824,7 +828,8 @@
     <div class="card w-full max-w-md mx-4 !border-[var(--color-border)]">
       <h3 class="text-lg font-semibold mb-4">Unzip Instructions</h3>
       <p class="text-sm text-[var(--color-text-secondary)] mb-4">The exported ZIP is password-protected with your
-        <strong>SETUP_PASSWORD</strong>.</p>
+        <strong>SETUP_PASSWORD</strong>.
+      </p>
       <div class="space-y-4">
         <div>
           <p class="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-semibold mb-2">macOS /
