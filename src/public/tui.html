@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦞 OpenClaw TUI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style type="text/tailwindcss">
+    @theme {
+      --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+  </style>
+  <style>
+    html, body {
+      overflow: hidden;
+    }
+    #terminal-container {
+      width: 100%;
+      height: calc(100vh - 56px);
+      overflow: hidden;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin {
+      animation: spin 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-neutral-950 text-neutral-100 min-h-screen font-sans">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
+    <div class="flex items-center gap-3">
+      <picture>
+        <img src="https://raw.githubusercontent.com/openclaw/openclaw/main/docs/assets/openclaw-logo-text.png" alt="OpenClaw" class="h-6">
+      </picture>
+      <span class="text-neutral-500 text-sm">Terminal</span>
+    </div>
+    <div id="status" class="flex items-center gap-2 text-sm">
+      <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+      <span class="text-neutral-400">Connecting...</span>
+    </div>
+  </div>
+
+  <div id="loading-overlay" class="absolute inset-0 top-[56px] bg-neutral-950 flex items-center justify-center z-40">
+    <div class="text-center">
+      <div class="w-8 h-8 border-2 border-neutral-700 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
+      <p class="text-neutral-400 text-sm">Starting terminal session...</p>
+    </div>
+  </div>
+
+  <div id="terminal-container"></div>
+
+  <div id="error-overlay" class="hidden fixed inset-0 bg-neutral-950/90 flex items-center justify-center z-50">
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-md mx-4 text-center">
+      <div class="text-red-400 text-lg font-medium mb-2" id="error-title">Connection Error</div>
+      <div class="text-neutral-400 text-sm mb-4" id="error-message"></div>
+      <button onclick="location.reload()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+        Reconnect
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const errorOverlay = document.getElementById('error-overlay');
+    const errorTitle = document.getElementById('error-title');
+    const errorMessage = document.getElementById('error-message');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    let sessionStarted = false;
+
+    function setStatus(state, text) {
+      const colors = {
+        connecting: 'bg-yellow-500',
+        connected: 'bg-green-500',
+        disconnected: 'bg-red-500',
+        error: 'bg-red-500'
+      };
+      statusEl.innerHTML = `
+        <span class="w-2 h-2 rounded-full ${colors[state] || colors.error}"></span>
+        <span class="text-neutral-400">${text}</span>
+      `;
+    }
+
+    function showError(title, message) {
+      loadingOverlay.style.display = 'none';
+      errorTitle.textContent = title;
+      errorMessage.textContent = message;
+      errorOverlay.classList.remove('hidden');
+    }
+
+    const term = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      scrollback: 0,
+      scrollOnUserInput: false,
+      smoothScrollDuration: 0,
+      allowTransparency: false,
+      theme: {
+        background: '#0a0a0a',
+        foreground: '#e5e5e5',
+        cursor: '#e5e5e5',
+        cursorAccent: '#0a0a0a',
+        selectionBackground: '#404040',
+        black: '#0a0a0a',
+        red: '#ef4444',
+        green: '#22c55e',
+        yellow: '#eab308',
+        blue: '#3b82f6',
+        magenta: '#a855f7',
+        cyan: '#06b6d4',
+        white: '#e5e5e5',
+        brightBlack: '#525252',
+        brightRed: '#f87171',
+        brightGreen: '#4ade80',
+        brightYellow: '#facc15',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#c084fc',
+        brightCyan: '#22d3ee',
+        brightWhite: '#fafafa'
+      }
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+
+    term.loadAddon(fitAddon);
+    term.loadAddon(webLinksAddon);
+
+    const container = document.getElementById('terminal-container');
+    term.open(container);
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${location.host}/tui/ws`;
+
+    let ws;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
+
+    function connect() {
+      setStatus('connecting', 'Connecting...');
+      sessionStarted = false;
+      loadingOverlay.style.display = 'flex';
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        setStatus('connected', 'Connected');
+        reconnectAttempts = 0;
+        fitAddon.fit();
+        ws.send(JSON.stringify({
+          type: 'resize',
+          cols: term.cols,
+          rows: term.rows
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        if (!sessionStarted) {
+          sessionStarted = true;
+          loadingOverlay.style.display = 'none';
+        }
+        term.write(event.data);
+      };
+
+      ws.onerror = () => {
+        setStatus('error', 'Connection error');
+      };
+
+      ws.onclose = (event) => {
+        setStatus('disconnected', 'Disconnected');
+
+        if (event.code === 4001) {
+          showError('Session Limit Reached', 'Another TUI session is already active. Only one session is allowed at a time.');
+        } else if (event.code === 4002) {
+          showError('Session Expired', 'Your session has been closed due to inactivity or timeout.');
+        } else if (event.code === 4003) {
+          showError('TUI Disabled', 'The web TUI is not enabled on this instance. Set ENABLE_WEB_TUI=true to enable it.');
+        } else if (event.code === 1008) {
+          showError('Authentication Required', 'Please authenticate to access the TUI.');
+        } else if (reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++;
+          setTimeout(connect, 1000 * reconnectAttempts);
+        } else {
+          showError('Connection Lost', 'Unable to reconnect to the terminal. Please refresh the page.');
+        }
+      };
+    }
+
+    term.onData((data) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'input', data }));
+      }
+    });
+
+    term.onResize(({ cols, rows }) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+      }
+    });
+
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => fitAddon.fit(), 200);
+    });
+
+    connect();
+  </script>
+</body>
+</html>
