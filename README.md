@@ -24,8 +24,7 @@ Check the **Variables** tab and save following:
 ### Step 3: Access Setup Wizard
 
 1. Click on the URL provided by Railway in your project dashboard (e.g., `https://your-app-xyz.up.railway.app`)
-2. Append `/setup` to the URL if not already there and visit it.
-3. Login prompt appears:
+2. Login prompt appears:
    - **Username**: Leave blank (press Enter)
    - **Password**: Enter your `SETUP_PASSWORD`
 
@@ -44,6 +43,7 @@ Once you log in, follow the intuitive 7-step guide on the left side of the setup
 6. First login? Click **Manage Devices** → **Approve Latest Request**
    *(New browsers need a one-time device approval. After clicking "Open OpenClaw UI", come back here, click "Manage Devices", and approve the pending request.)*
 7. You should now see **Health: OK** in the OpenClaw UI.
+
 ![Health Ok](https://res.cloudinary.com/asset-cloudinary/image/upload/v1772139788/health_ok_swgk94.png)
 
 ### Step 5: Start Chatting
