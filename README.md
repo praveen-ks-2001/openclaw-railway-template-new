@@ -21,19 +21,15 @@ Check the **Variables** tab and save following:
 
 ⚠️ **Keep this secure!** You'll need this in the next steps.
 
-### Step 3: Generate Public Domain
+### Step 3: Access Setup Wizard
 
-1. Go to **Settings** → **Networking** → Click **"Generate Domain"**
-2. Copy your Railway URL (e.g., `your-app-xyz.up.railway.app`)
-
-### Step 4: Access Setup Wizard
-
-1. Visit: `https://your-app-xyz.up.railway.app/setup`
-2. Login prompt appears:
+1. Click on the URL provided by Railway in your project dashboard (e.g., `https://your-app-xyz.up.railway.app`)
+2. Append `/setup` to the URL if not already there and visit it.
+3. Login prompt appears:
    - **Username**: Leave blank (press Enter)
    - **Password**: Enter your `SETUP_PASSWORD`
 
-### Step 5: Complete the Setup Wizard
+### Step 4: Complete the Setup Wizard
 
 Once you log in, follow the intuitive 7-step guide on the left side of the setup screen to bring your AI agent online:
 
@@ -50,7 +46,7 @@ Once you log in, follow the intuitive 7-step guide on the left side of the setup
 7. You should now see **Health: OK** in the OpenClaw UI.
 ![Health Ok](https://res.cloudinary.com/asset-cloudinary/image/upload/v1772139788/health_ok_swgk94.png)
 
-### Step 6: Start Chatting
+### Step 5: Start Chatting
 
 1. Click **"Chat"** in the sidebar of the newly opened OpenClaw UI
 2. Type your first message
@@ -238,7 +234,7 @@ Yes! Each Railway service can run its own independent OpenClaw instance:
 
 ## 🛠️ Support & Issues
 
-If you encounter any bugs, have feature requests, or need help with OpenClaw, please [open an issue on the GitHub repository](https://github.com/openclaw/openclaw/issues). 
+If you encounter any bugs, have feature requests, or need help with OpenClaw, please [open an issue on the GitHub repository](https://github.com/praveen-ks-2001/openclaw-railway-template-new/issues). 
 
 When reporting issues, please include:
 - A clear description of the problem
