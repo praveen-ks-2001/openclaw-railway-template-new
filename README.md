@@ -33,32 +33,26 @@ Check the **Variables** tab and save following:
    - **Username**: Leave blank (press Enter)
    - **Password**: Enter your `SETUP_PASSWORD`
 
-### Step 5: Configure Your AI Agent
+### Step 5: Complete the Setup Wizard
 
-In the setup wizard:
+Once you log in, follow the intuitive 7-step guide on the left side of the setup screen to bring your AI agent online:
 
-![OpenClaw setup using UI](https://res.cloudinary.com/asset-cloudinary/image/upload/v1769907891/setup_page_wgyx8k.png)
+![OpenClaw setup using UI](https://res.cloudinary.com/asset-cloudinary/image/upload/v1772139854/setup_page_pt4haa.png)
 
-1. **Provider Group**: Choose your AI provider (e.g., "Anthropic")
-2. **Auth Method**: Select "Anthropic API key" (or your provider's method)
-3. **Key/Token**: Paste your API key
-4. **Wizard Flow**: Keep as "quickstart"
-5. Click **"Run Setup"**
-6. Wait for completion (~30-60 seconds)
+1. Select your **provider & auth type**, then paste your API key
+2. Add **channels** (optional — can be done later)
+3. Click **Run Setup**
+4. If you added a channel token, click **Approve Pairing** and enter the code
+   *(After setup, message your bot on the channel. It will reply with a pairing code. Enter that code here to grant DM access.)*
+5. Click **Open OpenClaw UI**
+6. First login? Click **Manage Devices** → **Approve Latest Request**
+   *(New browsers need a one-time device approval. After clicking "Open OpenClaw UI", come back here, click "Manage Devices", and approve the pending request.)*
+7. You should now see **Health: OK** in the OpenClaw UI.
+![Health Ok](https://res.cloudinary.com/asset-cloudinary/image/upload/v1772139788/health_ok_swgk94.png)
 
-### Step 7: Connect to Gateway
+### Step 6: Start Chatting
 
-![OpenClaw Gateway token update](https://res.cloudinary.com/asset-cloudinary/image/upload/v1769907892/gateway_update_bs29gv.png)
-1. Click **"Open OpenClaw UI"** at the top of the setup page
-2. Navigate to **Overview** in the sidebar
-3. Find the **Gateway Access** section
-4. Paste your `OPENCLAW_GATEWAY_TOKEN` in the token field
-5. Click **"Connect"**
-6. Status changes to **Connected** 🟢
-
-### Step 8: Start Chatting
-
-1. Click **"Chat"** in the sidebar
+1. Click **"Chat"** in the sidebar of the newly opened OpenClaw UI
 2. Type your first message
 3. Enjoy your self-hosted AI assistant! 🎉
 
@@ -129,7 +123,7 @@ Deploying OpenClaw on Railway traditionally requires interactive terminal access
 
 **Step 2: Add to OpenClaw**
 1. Go to your setup wizard: `/setup`
-2. Scroll to **"Optional: Channels"** section
+2. Scroll to the **"Channels"** section
 3. Paste token in **"Telegram bot token"** field
 4. Click **"Run Setup"**
 5. Wait for completion
@@ -214,12 +208,12 @@ Absolutely! That's the beauty of self-hosting:
 ### Why is my OpenClaw UI gateway showing "Disconnected" after setup?
 
 This usually means:
-1. You haven't pasted the `OPENCLAW_GATEWAY_TOKEN` in the UI
-2. **Solution**: Go to Overview → Gateway Access → Paste token → Click Connect
+1. Railway is still deploying or the engine process hasn't fully started yet.
+2. **Solution**: Wait a minute and refresh the page.
 
 Or:
-1. The gateway process crashed due to invalid API key
-2. **Solution**: Check Railway logs, verify API key, re-run setup if needed
+1. The gateway process crashed due to an invalid API key.
+2. **Solution**: Check Railway logs, verify your API key, and re-run setup if needed.
 
 ### Can I use OpenClaw without any messaging channels?
 
@@ -240,3 +234,13 @@ Yes! Each Railway service can run its own independent OpenClaw instance:
 3. You can have separate instances for different purposes (personal, work, testing)
 4. Each instance needs its own API keys (or can share, depending on your API limits)
 
+---
+
+## 🛠️ Support & Issues
+
+If you encounter any bugs, have feature requests, or need help with OpenClaw, please [open an issue on the GitHub repository](https://github.com/openclaw/openclaw/issues). 
+
+When reporting issues, please include:
+- A clear description of the problem
+- Steps to reproduce
+- Relevant logs (you can find these in your Railway dashboard or export them via the setup wizard)
