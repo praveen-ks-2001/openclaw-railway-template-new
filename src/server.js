@@ -154,7 +154,7 @@ async function startGateway() {
   ]) {
     try {
       fs.rmSync(lockPath, { force: true });
-    } catch {}
+    } catch { }
   }
 
   const args = [
@@ -334,7 +334,7 @@ app.get("/setup/healthz", async (_req, res) => {
       const r = await fetch(`${GATEWAY_TARGET}/`, { signal: controller.signal });
       clearTimeout(timeout);
       gatewayReachable = r !== null;
-    } catch {}
+    } catch { }
   }
 
   res.json({
@@ -449,6 +449,14 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
         { value: "opencode-zen", label: "OpenCode Zen (multi-model proxy)" },
       ],
     },
+    {
+      value: "ollama",
+      label: "Ollama",
+      hint: "Local/self-hosted models",
+      options: [
+        { value: "ollama-local", label: "Ollama (auto-discover models)" },
+      ],
+    },
   ];
 
   res.json({
@@ -458,6 +466,7 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     channelsAddHelp: channelsHelp,
     authGroups,
     tuiEnabled: ENABLE_WEB_TUI,
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL?.trim() || null,
   });
 });
 
@@ -484,28 +493,33 @@ function buildOnboardArgs(payload) {
   ];
 
   if (payload.authChoice) {
-    args.push("--auth-choice", payload.authChoice);
+    // Ollama doesn't need a real auth choice — use openai with a dummy key
+    if (payload.authChoice === "ollama-local") {
+      args.push("--auth-choice", "openai-api-key");
+      args.push("--openai-api-key", "sk-ollama-placeholder");
+    } else {
+      args.push("--auth-choice", payload.authChoice);
 
-    const secret = (payload.authSecret || "").trim();
-    const map = {
-      "openai-api-key": "--openai-api-key",
-      apiKey: "--anthropic-api-key",
-      "openrouter-api-key": "--openrouter-api-key",
-      "ai-gateway-api-key": "--ai-gateway-api-key",
-      "moonshot-api-key": "--moonshot-api-key",
-      "kimi-code-api-key": "--kimi-code-api-key",
-      "gemini-api-key": "--gemini-api-key",
-      "zai-api-key": "--zai-api-key",
-      "minimax-api": "--minimax-api-key",
-      "minimax-api-lightning": "--minimax-api-key",
-      "synthetic-api-key": "--synthetic-api-key",
-      "opencode-zen": "--opencode-zen-api-key",
-    };
-    const flag = map[payload.authChoice];
-    if (flag && secret) {
-      args.push(flag, secret);
+      const secret = (payload.authSecret || "").trim();
+      const map = {
+        "openai-api-key": "--openai-api-key",
+        apiKey: "--anthropic-api-key",
+        "openrouter-api-key": "--openrouter-api-key",
+        "ai-gateway-api-key": "--ai-gateway-api-key",
+        "moonshot-api-key": "--moonshot-api-key",
+        "kimi-code-api-key": "--kimi-code-api-key",
+        "gemini-api-key": "--gemini-api-key",
+        "zai-api-key": "--zai-api-key",
+        "minimax-api": "--minimax-api-key",
+        "minimax-api-lightning": "--minimax-api-key",
+        "synthetic-api-key": "--synthetic-api-key",
+        "opencode-zen": "--opencode-zen-api-key",
+      };
+      const flag = map[payload.authChoice];
+      if (flag && secret) {
+        args.push(flag, secret);
+      }
     }
-
   }
 
   return args;
@@ -551,10 +565,11 @@ const VALID_AUTH_CHOICES = [
   "copilot-proxy",
   "synthetic-api-key",
   "opencode-zen",
+  "ollama-local",
 ];
 
 function validatePayload(payload) {
-if (payload.authChoice && !VALID_AUTH_CHOICES.includes(payload.authChoice)) {
+  if (payload.authChoice && !VALID_AUTH_CHOICES.includes(payload.authChoice)) {
     return `Invalid authChoice: ${payload.authChoice}`;
   }
   const stringFields = [
@@ -644,6 +659,29 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
           clawArgs(["models", "set", payload.model.trim()]),
         );
         extra += `[models set] exit=${modelResult.code}\n${modelResult.output || ""}`;
+      }
+
+      // Configure Ollama provider if selected
+      if (payload.authChoice === "ollama-local") {
+        const ollamaBaseUrl = process.env.OLLAMA_BASE_URL?.trim() || "http://localhost:11434";
+        extra += `\n[setup] Configuring Ollama provider (baseUrl=${ollamaBaseUrl})...\n`;
+        const ollamaConfig = {
+          baseUrl: ollamaBaseUrl,
+          api: "ollama",
+          apiKey: "ollama-local",
+        };
+        const ollamaResult = await runCmd(
+          OPENCLAW_NODE,
+          clawArgs([
+            "config",
+            "set",
+            "--json",
+            "models.providers.ollama",
+            JSON.stringify(ollamaConfig),
+          ]),
+        );
+        extra += `[config] models.providers.ollama exit=${ollamaResult.code}\n`;
+        if (ollamaResult.output) extra += ollamaResult.output;
       }
 
       async function configureChannel(name, cfgObj) {
@@ -737,6 +775,43 @@ app.get("/setup/api/debug", requireSetupAuth, async (_req, res) => {
       channelsAddHelpIncludesTelegram: help.output.includes("telegram"),
     },
   });
+});
+
+app.get("/setup/api/ollama/models", requireSetupAuth, async (_req, res) => {
+  const ollamaBaseUrl = process.env.OLLAMA_BASE_URL?.trim();
+  if (!ollamaBaseUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "OLLAMA_BASE_URL environment variable is not set. Set it in Railway Variables.",
+    });
+  }
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const r = await fetch(`${ollamaBaseUrl}/api/tags`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!r.ok) {
+      return res.status(502).json({
+        ok: false,
+        error: `Ollama returned HTTP ${r.status}`,
+      });
+    }
+    const data = await r.json();
+    const models = (data.models || []).map((m) => ({
+      name: m.name,
+      size: m.size,
+      modified: m.modified_at,
+      digest: m.digest,
+    }));
+    return res.json({ ok: true, models });
+  } catch (err) {
+    const msg = err.name === "AbortError"
+      ? "Connection to Ollama timed out (10s)"
+      : `Failed to reach Ollama: ${err.message}`;
+    return res.status(502).json({ ok: false, error: msg });
+  }
 });
 
 app.post("/setup/api/pairing/approve", requireSetupAuth, async (req, res) => {
@@ -847,17 +922,17 @@ app.get("/setup/api/export", requireSetupAuth, async (_req, res) => {
     const stream = fs.createReadStream(tmpZip);
     stream.pipe(res);
     stream.on("end", () => {
-      try { fs.rmSync(tmpZip, { force: true }); } catch {}
+      try { fs.rmSync(tmpZip, { force: true }); } catch { }
     });
     stream.on("error", (err) => {
       console.error("[export] stream error:", err);
-      try { fs.rmSync(tmpZip, { force: true }); } catch {}
+      try { fs.rmSync(tmpZip, { force: true }); } catch { }
       if (!res.headersSent) {
         res.status(500).json({ ok: false, error: "Stream error during export." });
       }
     });
   } catch (err) {
-    try { fs.rmSync(tmpZip, { force: true }); } catch {}
+    try { fs.rmSync(tmpZip, { force: true }); } catch { }
     console.error("[export] error:", err);
     return res.status(500).json({ ok: false, error: `Export failed: ${err.message}` });
   }
@@ -992,7 +1067,7 @@ function createTuiWebSocketServer(httpServer) {
       if (ptyProcess) {
         try {
           ptyProcess.kill();
-        } catch {}
+        } catch { }
       }
       activeTuiSession = null;
     });
@@ -1149,7 +1224,7 @@ async function gracefulShutdown(signal) {
     try {
       activeTuiSession.ws.close(1001, "Server shutting down");
       activeTuiSession.pty.kill();
-    } catch {}
+    } catch { }
     activeTuiSession = null;
   }
 

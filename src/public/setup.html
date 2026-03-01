@@ -85,6 +85,14 @@
         devices: [],
         devicesPending: [],
         devicesPaired: [],
+        ollamaBaseUrl: '',
+        ollamaModels: [],
+        ollamaModelsLoading: false,
+        ollamaModelsError: '',
+
+        get isOllama() {
+          return this.selectedGroup === 'ollama';
+        },
 
         get currentGroup() {
           return this.authGroups.find(g => g.value === this.selectedGroup);
@@ -104,13 +112,14 @@
           return res.json();
         },
 
-        async refreshStatus() {
+         async refreshStatus() {
           this.status = 'Loading...';
           try {
             const j = await this.httpJson('/setup/api/status');
             this.configured = j.configured;
             this.openclawVersion = j.openclawVersion || '';
             this.tuiEnabled = j.tuiEnabled || false;
+            this.ollamaBaseUrl = j.ollamaBaseUrl || '';
             this.status = j.configured ? 'Configured - open /openclaw' : 'Not configured - run setup below';
             this.authGroups = j.authGroups || [];
             if (this.authGroups.length > 0) {
@@ -133,6 +142,13 @@
           if (this.authChoices.length > 0) {
             this.selectedAuth = this.authChoices[0].value;
           }
+          // Auto-fetch Ollama models when Ollama is selected
+          if (this.isOllama && this.ollamaBaseUrl) {
+            this.fetchOllamaModels();
+          } else {
+            this.ollamaModels = [];
+            this.ollamaModelsError = '';
+          }
         },
 
         nextStep() {
@@ -141,6 +157,35 @@
 
         prevStep() {
           if (this.step > 1) this.step--;
+        },
+
+        async fetchOllamaModels() {
+          this.ollamaModelsLoading = true;
+          this.ollamaModelsError = '';
+          this.ollamaModels = [];
+          try {
+            const j = await this.httpJson('/setup/api/ollama/models');
+            this.ollamaModels = j.models || [];
+            if (this.ollamaModels.length > 0 && !this.model) {
+              this.model = 'ollama/' + this.ollamaModels[0].name;
+            }
+          } catch (e) {
+            this.ollamaModelsError = String(e).replace('Error: ', '');
+          } finally {
+            this.ollamaModelsLoading = false;
+          }
+        },
+
+        selectOllamaModel(name) {
+          this.model = 'ollama/' + name;
+        },
+
+        formatSize(bytes) {
+          if (!bytes) return '';
+          const gb = bytes / (1024 * 1024 * 1024);
+          if (gb >= 1) return gb.toFixed(1) + ' GB';
+          const mb = bytes / (1024 * 1024);
+          return mb.toFixed(0) + ' MB';
         },
 
         async runSetup() {
@@ -508,7 +553,7 @@
                       </template>
                     </select>
                   </div>
-                  <div>
+                  <div x-show="!isOllama">
                     <label
                       class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">Auth
                       Method</label>
@@ -518,19 +563,90 @@
                       </template>
                     </select>
                   </div>
-                  <div>
+                  <div x-show="!isOllama">
                     <label
                       class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">API
                       Key / Token</label>
                     <input x-model="authSecret" type="password" placeholder="Paste your API key or token"
                       class="input-field" />
                   </div>
+
+                  <!-- Ollama-specific UI -->
+                  <template x-if="isOllama">
+                    <div class="space-y-4">
+                      <!-- Ollama Base URL status -->
+                      <div x-show="ollamaBaseUrl"
+                        class="flex items-center gap-2 text-sm bg-[#238636]/10 border border-[#238636]/30 rounded-lg px-4 py-3">
+                        <span class="w-2 h-2 rounded-full bg-[var(--color-success)] shrink-0"></span>
+                        <span class="text-[var(--color-text-secondary)]">
+                          Ollama URL: <strong class="text-[var(--color-text-primary)]" x-text="ollamaBaseUrl"></strong>
+                        </span>
+                      </div>
+                      <div x-show="!ollamaBaseUrl"
+                        class="flex items-start gap-2 text-sm bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 rounded-lg px-4 py-3">
+                        <svg class="w-4 h-4 text-[var(--color-warning)] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div>
+                          <p class="text-[var(--color-warning)] font-medium">OLLAMA_BASE_URL not set</p>
+                          <p class="text-[var(--color-text-muted)] text-xs mt-1">Set <code class="text-xs bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">OLLAMA_BASE_URL</code> in Railway Variables (e.g. <code class="text-xs bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">http://ollama.railway.internal:11434</code>), then redeploy.</p>
+                        </div>
+                      </div>
+
+                      <!-- Fetch models button -->
+                      <div>
+                        <div class="flex items-center gap-3 mb-3">
+                          <label class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium">Available Models</label>
+                          <button @click="fetchOllamaModels()" :disabled="ollamaModelsLoading || !ollamaBaseUrl" class="btn btn-secondary !py-1 !px-3 text-xs">
+                            <span x-show="!ollamaModelsLoading">↻ Refresh</span>
+                            <span x-show="ollamaModelsLoading" class="flex items-center gap-1">
+                              <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              Fetching...
+                            </span>
+                          </button>
+                        </div>
+
+                        <!-- Error -->
+                        <div x-show="ollamaModelsError" class="text-sm text-[var(--color-danger)] bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 rounded-lg px-4 py-3 mb-3" x-text="ollamaModelsError"></div>
+
+                        <!-- Models list -->
+                        <div x-show="ollamaModels.length > 0" class="space-y-2">
+                          <template x-for="m in ollamaModels" :key="m.name">
+                            <button @click="selectOllamaModel(m.name)" type="button"
+                              class="w-full text-left flex items-center justify-between bg-[var(--color-surface)] border rounded-lg px-4 py-3 transition-all cursor-pointer"
+                              :class="model === 'ollama/' + m.name ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5' : 'border-[var(--color-border-muted)] hover:border-[var(--color-border)]'">
+                              <div class="min-w-0">
+                                <p class="text-sm font-medium truncate" x-text="m.name"></p>
+                                <p class="text-xs text-[var(--color-text-muted)]" x-text="formatSize(m.size)"></p>
+                              </div>
+                              <div x-show="model === 'ollama/' + m.name" class="shrink-0 ml-3">
+                                <svg class="w-5 h-5 text-[var(--color-accent)]" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                              </div>
+                            </button>
+                          </template>
+                        </div>
+
+                        <!-- No models -->
+                        <div x-show="ollamaModels.length === 0 && !ollamaModelsLoading && !ollamaModelsError && ollamaBaseUrl"
+                          class="text-sm text-[var(--color-text-muted)] bg-[var(--color-surface)] rounded-lg border border-[var(--color-border-muted)] px-4 py-3">
+                          No models found. Pull a model first: <code class="text-xs bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">ollama pull qwen2.5-coder:32b</code>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
                   <div>
                     <label
                       class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">Model</label>
                     <input x-model="model" type="text" placeholder="e.g. openai/gpt-4.1, anthropic/claude-sonnet-4"
                       class="input-field" />
-                    <p class="text-xs text-[var(--color-text-muted)] mt-1.5">Format: provider/model-name</p>
+                    <p x-show="!isOllama" class="text-xs text-[var(--color-text-muted)] mt-1.5">Format: provider/model-name</p>
+                    <p x-show="isOllama" class="text-xs text-[var(--color-text-muted)] mt-1.5">Format: ollama/model-name (auto-filled when you select a model above)</p>
                   </div>
                 </div>
               </section>
