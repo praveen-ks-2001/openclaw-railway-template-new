@@ -12,7 +12,7 @@ RUN apt-get update \
     zip \
   && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g openclaw@latest
+RUN npm install -g openclaw@2026.3.2
 
 WORKDIR /app
 
