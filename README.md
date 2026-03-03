@@ -168,67 +168,62 @@ Deploying OpenClaw on Railway traditionally requires interactive terminal access
 
 ## ❓ Frequently Asked Questions (FAQ)
 
+### The OpenClaw UI says "Pairing Required" — what do I do?
+
+Any new browser opening the OpenClaw UI needs a one-time device approval. Go to `/setup`, click **Manage Devices** → **Approve Latest Request**. That's it — the browser is now authorized.
+
+### The UI shows "Gateway Disconnected" or an auth error
+
+Go to `/setup` and click **Open OpenClaw UI** from there. This automatically injects the required auth tokens into the session. Opening the UI directly from the Railway URL without going through `/setup` first will cause this.
+
+### How do I approve a Telegram or Discord channel?
+
+After running setup:
+1. Go to `/setup` → click **Approve Pairing**
+2. Enter the pairing code shown in your channel
+
+If no pairing code appeared, send `hey` to your bot in the channel — it will reply with the code. Then enter that code in the Approve Pairing dialog.
+
+### How do I enable the TUI (terminal UI)?
+
+Set the environment variable `ENABLE_TUI=true` in your Railway service variables, then redeploy. Once running, access it at `/tui` on your Railway URL.
+
 ### What is the difference between OpenClaw, Clawdbot, and Moltbot?
 
-OpenClaw is the current official name of the project. It was previously known as "Clawdbot" and "Moltbot" - these are older names for the same framework. 
-
-### Can I use multiple AI providers at once in OpenClaw?
-
-Currently, OpenClaw is configured to use one primary AI provider at a time. However, you can switch providers by editing the configuration via the setup wizard's config editor or by re-running the setup wizard.
+Same project, different names over time. Moltbot → Clawdbot → OpenClaw is the evolution. OpenClaw is the current name.
 
 ### How much does it cost to run OpenClaw on Railway?
 
-**Railway costs**: $5-10/month on the Hobby plan ($5/month subscription + ~$5 usage). Free tier available with limitations.
+**Railway**: ~$5-10/month (Hobby plan: $5/month base + usage). Free tier available with limits.
 
-**AI API costs**: Varies by usage and provider:
+**AI API costs** (varies by usage):
 - Anthropic Claude: ~$5-30/month for moderate personal use
-- OpenAI GPT: ~$5-40/month depending on model and usage
+- OpenAI GPT: ~$5-40/month depending on model
 - Google Gemini: Often free for personal use
 
-### Is my data private and secure on OpenClaw?
+### Is my data private?
 
-Yes! OpenClaw is self-hosted, meaning:
-- All data stays on your Railway instance
-- API keys are encrypted and stored in your volume
-- Communication between browser and gateway is encrypted (HTTPS)
+Yes. OpenClaw is self-hosted — all data stays on your Railway instance. API keys are stored encrypted in your volume. Traffic is HTTPS.
 
-### Can I migrate my OpenClaw instance off Railway?
+### Can I switch AI providers after setup?
 
-Absolutely! That's the beauty of self-hosting:
+Yes. Go to `/setup`, change the provider and API key in the config, and click **Run Setup** again.
 
-1. Export a backup via `/setup`
-2. Download the `.tar.gz` file
-3. Deploy OpenClaw on another platform (VPS, Docker, home server)
-4. Import the backup on your new instance
+### Can I use OpenClaw without Telegram/Discord?
 
-### Why is my OpenClaw UI gateway showing "Disconnected" after setup?
+Yes. The web UI at your Railway URL is fully functional on its own. Channels are optional.
 
-This usually means:
-1. Railway is still deploying or the engine process hasn't fully started yet.
-2. **Solution**: Wait a minute and refresh the page.
+### How do I access it from my phone?
 
-Or:
-1. The gateway process crashed due to an invalid API key.
-2. **Solution**: Check Railway logs, verify your API key, and re-run setup if needed.
-
-### Can I use OpenClaw without any messaging channels?
-
-Yes! The web UI at `/` provides a full-featured chat interface. Telegram, Discord, and Slack are optional additions for convenience. You can use OpenClaw entirely through the web interface if you prefer.
-
-### How do I access OpenClaw from my phone?
-
-- **Web Interface**: Just visit your Railway URL in your mobile browser
-- **Telegram**: Add the Telegram bot and chat from the Telegram app
-- **Discord**: Use Discord mobile app with your bot
-- **Slack**: Use Slack mobile app with your bot
+Visit your Railway URL in a mobile browser, or use the Telegram/Discord/Slack apps if you've set up those channels.
 
 ### Can I run multiple OpenClaw instances?
 
-Yes! Each Railway service can run its own independent OpenClaw instance:
-1. Deploy the template multiple times
-2. Each gets its own domain, volume, and configuration
-3. You can have separate instances for different purposes (personal, work, testing)
-4. Each instance needs its own API keys (or can share, depending on your API limits)
+Yes — deploy the template multiple times on Railway. Each gets its own domain, volume, and config. Useful for separating personal and work use.
+
+### Can I migrate off Railway?
+
+Yes. Go to `/setup` → export a backup (`.tar.gz`) → deploy OpenClaw on any platform (VPS, Docker, home server) → import the backup there.
 
 ---
 
