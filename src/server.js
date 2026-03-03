@@ -119,9 +119,9 @@ async function syncAllowedOrigins() {
     ]),
   );
   if (result.code === 0) {
-    log.info("gateway", `set allowedOrigins to [${origin}]`);
+    console.log("gateway", `set allowedOrigins to [${origin}]`);
   } else {
-    log.warn("gateway", `failed to set allowedOrigins (exit=${result.code})`);
+    console.warn("gateway", `failed to set allowedOrigins (exit=${result.code})`);
   }
 }
 
