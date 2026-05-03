@@ -89,6 +89,14 @@
         devicesPaired: [],
         gatewayTokenCopied: false,
         gatewayToken: '',
+        loginUrl: '',
+        loginCode: '',
+        setupStreamTail: '',
+        setupError: '',
+
+        get isOauthChoice() {
+          return this.selectedAuth === 'openai-codex-device-code';
+        },
 
         get currentGroup() {
           return this.authGroups.find(g => g.value === this.selectedGroup);
@@ -149,6 +157,10 @@
         },
 
         async runSetup() {
+          this.loginUrl = '';
+          this.loginCode = '';
+          this.setupError = '';
+          this.setupStreamTail = '';
           const payload = {
             authChoice: this.selectedAuth,
             authSecret: this.authSecret,
@@ -169,15 +181,52 @@
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify(payload)
             });
-            const text = await res.text();
-            let j;
-            try { j = JSON.parse(text); } catch (_e) { j = { ok: false, output: text }; }
-            this.log += (j.output || JSON.stringify(j, null, 2));
+            if (res.body) {
+              const reader = res.body.getReader();
+              const decoder = new TextDecoder();
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                this.processSetupChunk(decoder.decode(value, { stream: true }));
+              }
+              this.processSetupChunk(decoder.decode());
+            } else {
+              this.processSetupChunk(await res.text());
+            }
+            if (!res.ok && !this.setupError) {
+              this.setupError = 'Setup request failed with HTTP ' + res.status + '.';
+            }
             await this.refreshStatus();
           } catch (e) {
-            this.log += '\nError: ' + String(e) + '\n';
+            this.setupError = 'Setup request failed.';
+            this.processSetupChunk('\nError: ' + String(e) + '\n');
           } finally {
             this.loading = false;
+          }
+        },
+
+        processSetupChunk(chunk) {
+          if (!chunk) return;
+          this.log += chunk;
+          const scanText = this.setupStreamTail + chunk;
+          this.setupStreamTail = scanText.slice(-1000);
+          this.extractLoginDetails(scanText);
+          this.extractSetupFailure(scanText);
+        },
+
+        extractLoginDetails(text) {
+          const urlMatch = text.match(/https:\/\/auth\.openai\.com\/codex\/device[^\s)]*/);
+          if (urlMatch) this.loginUrl = urlMatch[0];
+          const codeMatches = [...text.matchAll(/\bCode:\s*([A-Z0-9][A-Z0-9-]{3,})\b/g)];
+          const visibleCode = codeMatches.map(m => m[1]).find(code => code !== 'shown');
+          if (visibleCode) this.loginCode = visibleCode;
+        },
+
+        extractSetupFailure(text) {
+          if (text.includes('[setup] Internal error')) {
+            this.setupError = 'Setup hit an internal error. Review the log below.';
+          } else if (text.includes('[setup] Failed')) {
+            this.setupError = 'Setup failed. Review the log below.';
           }
         },
 
@@ -542,12 +591,16 @@
                       </template>
                     </select>
                   </div>
-                  <div>
+                  <div x-show="!isOauthChoice">
                     <label
                       class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">API
                       Key / Token</label>
                     <input x-model="authSecret" type="password" placeholder="Paste your API key or token"
                       class="input-field" />
+                  </div>
+                  <div x-show="isOauthChoice"
+                    class="bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3 text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                    <strong class="text-[var(--color-text-primary)]">No API key needed.</strong> When you click Run Setup, a ChatGPT login URL and code will appear below — open the URL, sign in, and enter the code.
                   </div>
                   <div>
                     <label
@@ -657,6 +710,19 @@
                   </button>
                   <button @click="resetSetup()" :disabled="loading" class="btn btn-danger">Reset</button>
                 </div>
+                <div x-show="loginUrl || loginCode"
+                  class="bg-[#6e40c9]/10 border border-[#6e40c9]/40 rounded-lg p-4 mb-4">
+                  <p class="text-[10px] uppercase tracking-widest text-[#a779e9] font-semibold mb-2">ChatGPT Login</p>
+                  <a x-show="loginUrl" :href="loginUrl" target="_blank" rel="noopener noreferrer"
+                    class="block text-sm text-[var(--color-accent)] hover:underline break-all mb-2"
+                    x-text="loginUrl"></a>
+                  <div x-show="loginCode"
+                    class="font-mono text-xl font-bold text-[var(--color-text-primary)] tracking-widest bg-[var(--color-surface)] rounded px-3 py-2 inline-block"
+                    x-text="loginCode"></div>
+                </div>
+                <div x-show="setupError"
+                  class="bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/40 rounded-lg p-3 mb-4 text-sm text-[var(--color-danger)]"
+                  x-text="setupError"></div>
                 <div x-show="log" class="log-box" x-text="log"></div>
               </section>
             </div>
