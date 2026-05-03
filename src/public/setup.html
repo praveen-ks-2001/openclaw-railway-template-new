@@ -492,6 +492,13 @@
             </ol>
           </div>
 
+          <div class="mt-4 p-3 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30">
+            <p class="text-[11px] uppercase tracking-widest text-[var(--color-warning)] font-semibold mb-1.5">Heads up</p>
+            <p class="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
+              Set <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code> to <strong class="text-[var(--color-text-primary)]">2026.5.X</strong> or newer in your Railway env vars. This template has been updated for the latest OpenClaw releases.
+            </p>
+          </div>
+
           <div class="mt-4 px-2">
             <div class="text-xs text-[var(--color-text-muted)] text-right pr-2">
               <span x-show="openclawVersion" x-text="'v' + openclawVersion"></span>
@@ -545,7 +552,7 @@
                   <div>
                     <label
                       class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">Model</label>
-                    <input x-model="model" type="text" placeholder="e.g. openai/gpt-4.1, anthropic/claude-sonnet-4"
+                    <input x-model="model" type="text" placeholder="e.g. anthropic/claude-opus-4-7, minimax/MiniMax-M2.7"
                       class="input-field" />
                     <p class="text-xs text-[var(--color-text-muted)] mt-1.5">Format: provider/model-name</p>
                   </div>

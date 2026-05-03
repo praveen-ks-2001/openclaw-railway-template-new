@@ -1,8 +1,10 @@
 import childProcess from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import express from "express";
 import httpProxy from "http-proxy";
@@ -86,6 +88,68 @@ const TUI_MAX_SESSION_MS = Number.parseInt(
 
 function clawArgs(args) {
   return [OPENCLAW_ENTRY, ...args];
+}
+
+let deviceBootstrapSdkPromise = null;
+
+function resolveDeviceBootstrapSdkPath() {
+  const entryPath = path.resolve(OPENCLAW_ENTRY);
+  try {
+    const requireFromOpenclaw = createRequire(entryPath);
+    return requireFromOpenclaw.resolve("openclaw/plugin-sdk/device-bootstrap");
+  } catch {
+    const openclawRoot = path.dirname(path.dirname(entryPath));
+    return path.join(openclawRoot, "dist", "plugin-sdk", "device-bootstrap.js");
+  }
+}
+
+async function loadDeviceBootstrapSdk() {
+  if (!deviceBootstrapSdkPromise) {
+    deviceBootstrapSdkPromise = import(
+      pathToFileURL(resolveDeviceBootstrapSdkPath()).href
+    ).catch((err) => {
+      deviceBootstrapSdkPromise = null;
+      throw err;
+    });
+  }
+  return deviceBootstrapSdkPromise;
+}
+
+function devicePairingTimestamp(request) {
+  const ts = request?.ts;
+  if (typeof ts === "number") return ts;
+  if (typeof ts === "string") {
+    const parsed = Date.parse(ts);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+function newestPendingDevicePairing(pending) {
+  if (!Array.isArray(pending) || pending.length === 0) return null;
+  return pending.reduce((latest, current) =>
+    devicePairingTimestamp(current) > devicePairingTimestamp(latest)
+      ? current
+      : latest,
+  );
+}
+
+function describeDeviceApprovalForbidden(result) {
+  const scope = result?.scope || "unknown";
+  const role = result?.role || "unknown";
+  switch (result?.reason) {
+    case "caller-scopes-required":
+    case "caller-missing-scope":
+      return `missing scope: ${scope}`;
+    case "scope-outside-requested-roles":
+      return `invalid scope for requested roles: ${scope}`;
+    case "bootstrap-role-not-allowed":
+      return `bootstrap profile does not allow role: ${role}`;
+    case "bootstrap-scope-not-allowed":
+      return `bootstrap profile does not allow scope: ${scope}`;
+    default:
+      return "Device approval is forbidden by bootstrap policy.";
+  }
 }
 
 function configPath() {
@@ -437,17 +501,20 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     {
       value: "minimax",
       label: "MiniMax",
-      hint: "M2.1 (recommended)",
+      hint: "M2.7 (recommended)",
       options: [
-        { value: "minimax-global-api", label: "MiniMax M2.1" },
-        { value: "minimax-global-api-lightning", label: "MiniMax M2.1 Lightning" },
+        { value: "minimax-global-api", label: "MiniMax API key (Global)" },
+        { value: "minimax-cn-api", label: "MiniMax API key (CN)" },
       ],
     },
     {
       value: "qwen",
       label: "Qwen",
-      hint: "OAuth",
-      options: [{ value: "qwen-portal", label: "Qwen OAuth" }],
+      hint: "API key",
+      options: [
+        { value: "qwen-api-key", label: "Qwen API key (Global)" },
+        { value: "qwen-api-key-cn", label: "Qwen API key (CN)" },
+      ],
     },
     {
       value: "copilot",
@@ -524,7 +591,9 @@ function buildOnboardArgs(payload) {
       "gemini-api-key": "--gemini-api-key",
       "zai-api-key": "--zai-api-key",
       "minimax-global-api": "--minimax-api-key",
-      "minimax-global-api-lightning": "--minimax-api-key",
+      "minimax-cn-api": "--minimax-api-key",
+      "qwen-api-key": "--qwen-api-key",
+      "qwen-api-key-cn": "--qwen-api-key",
       "synthetic-api-key": "--synthetic-api-key",
       "opencode-zen": "--opencode-zen-api-key",
     };
@@ -572,8 +641,9 @@ const VALID_AUTH_CHOICES = [
   "kimi-code-api-key",
   "zai-api-key",
   "minimax-global-api",
-  "minimax-global-api-lightning",
-  "qwen-portal",
+  "minimax-cn-api",
+  "qwen-api-key",
+  "qwen-api-key-cn",
   "github-copilot",
   "copilot-proxy",
   "synthetic-api-key",
@@ -697,10 +767,8 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       if (payload.telegramToken?.trim()) {
         extra += await configureChannel("telegram", {
           enabled: true,
-          dmPolicy: "pairing",
           botToken: payload.telegramToken.trim(),
-          groupPolicy: "allowlist",
-          streaming: "partial",
+          streaming: { mode: "partial" },
         });
       }
 
@@ -803,37 +871,80 @@ app.post("/setup/api/doctor", requireSetupAuth, async (_req, res) => {
 });
 
 app.get("/setup/api/devices", requireSetupAuth, async (_req, res) => {
-  const args = ["devices", "list", "--json", "--token", OPENCLAW_GATEWAY_TOKEN];
-  const result = await runCmd(OPENCLAW_NODE, clawArgs(args));
-  console.log(`[devices] list exit=${result.code} output=${result.output}`);
   try {
-    const jsonMatch = result.output.match(/(\{[\s\S]*\}|\[[\s\S]*\])\s*$/);
-    if (!jsonMatch) {
-      console.warn("[devices] no JSON found in output");
-      return res.json({ ok: result.code === 0, raw: result.output });
-    }
-    const data = JSON.parse(jsonMatch[1]);
-    console.log(`[devices] parsed keys=${Object.keys(data)} pending=${JSON.stringify(data.pending)} paired=${JSON.stringify(data.paired)}`);
-    return res.json({ ok: true, data, raw: result.output });
-  } catch (parseErr) {
-    console.warn(`[devices] JSON parse failed: ${parseErr.message}`);
-    return res.json({ ok: result.code === 0, raw: result.output });
+    const { listDevicePairing } = await loadDeviceBootstrapSdk();
+    const data = await listDevicePairing();
+    return res.json({ ok: true, data });
+  } catch (err) {
+    const message = err?.message || String(err);
+    console.warn(`[devices] local list failed: ${message}`);
+    return res.status(500).json({ ok: false, error: message });
   }
 });
 
 app.post("/setup/api/devices/approve", requireSetupAuth, async (req, res) => {
-  const { requestId } = req.body || {};
-  const args = ["devices", "approve"];
-  if (requestId) {
-    args.push(String(requestId));
-  } else {
-    args.push("--latest");
+  const requestId = String(req.body?.requestId || "").trim();
+
+  try {
+    const { approveDevicePairing, listDevicePairing } =
+      await loadDeviceBootstrapSdk();
+    const pairings = await listDevicePairing();
+    const pending = Array.isArray(pairings?.pending) ? pairings.pending : [];
+
+    let targetRequestId = requestId;
+    if (targetRequestId) {
+      const exists = pending.some(
+        (request) => request?.requestId === targetRequestId,
+      );
+      if (!exists) {
+        return res.status(404).json({
+          ok: false,
+          error: `Unknown pending device pairing request: ${targetRequestId}`,
+        });
+      }
+    } else {
+      const latest = newestPendingDevicePairing(pending);
+      targetRequestId = latest?.requestId || "";
+      if (!targetRequestId) {
+        return res.status(404).json({
+          ok: false,
+          error: "No pending device pairing requests.",
+        });
+      }
+    }
+
+    const result = await approveDevicePairing(targetRequestId, {
+      // /setup is guarded by SETUP_PASSWORD and runs in the same state volume
+      // as the gateway, so it acts as the trusted bootstrap admin surface.
+      callerScopes: ["operator.admin"],
+    });
+
+    if (!result) {
+      return res.status(404).json({
+        ok: false,
+        error: `Unknown pending device pairing request: ${targetRequestId}`,
+      });
+    }
+
+    if (result.status === "forbidden") {
+      return res.status(403).json({
+        ok: false,
+        error: describeDeviceApprovalForbidden(result),
+        reason: result.reason,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      requestId: targetRequestId,
+      device: result.device,
+      output: `Approved device pairing request ${targetRequestId}.`,
+    });
+  } catch (err) {
+    const message = err?.message || String(err);
+    console.warn(`[devices] local approve failed: ${message}`);
+    return res.status(500).json({ ok: false, error: message });
   }
-  args.push("--token", OPENCLAW_GATEWAY_TOKEN);
-  const result = await runCmd(OPENCLAW_NODE, clawArgs(args));
-  return res
-    .status(result.code === 0 ? 200 : 500)
-    .json({ ok: result.code === 0, output: result.output });
 });
 
 app.post("/setup/api/devices/reject", requireSetupAuth, async (req, res) => {

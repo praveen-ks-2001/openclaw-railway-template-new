@@ -6,6 +6,7 @@ npm-debug.log*
 .env
 src_ref
 CLAUDE.md
+oc_main
 
 # Build artifacts
 /dist
