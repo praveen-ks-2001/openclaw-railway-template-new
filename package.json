@@ -2,6 +2,7 @@
   "name": "openclaw-railway-template",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.12.4",
   "engines": {
     "node": ">=24"
   },
