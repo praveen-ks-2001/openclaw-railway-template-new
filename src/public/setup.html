@@ -101,6 +101,15 @@
         wipePassword: '',
         wipeError: '',
         wiping: false,
+        showImportModal: false,
+        importFile: null,
+        importPhase: 'idle', // 'idle' | 'probing' | 'awaiting-zip-password' | 'awaiting-confirm' | 'applying'
+        importStagingId: '',
+        importManifest: null,
+        importZipPassword: '',
+        importSetupPassword: '',
+        importError: '',
+        importInfo: '',
         customBaseUrl: '',
         customModelId: '',
         customCompatibility: 'openai',
@@ -388,6 +397,113 @@
             this.wipeError = 'Wipe request failed: ' + String(e);
           } finally {
             this.wiping = false;
+          }
+        },
+
+        openImportModal() {
+          this.importFile = null;
+          this.importPhase = 'idle';
+          this.importStagingId = '';
+          this.importManifest = null;
+          this.importZipPassword = '';
+          this.importSetupPassword = '';
+          this.importError = '';
+          this.importInfo = '';
+          this.showImportModal = true;
+        },
+
+        closeImportModal() {
+          if (this.importPhase === 'applying') return; // don't allow dismiss while applying
+          this.showImportModal = false;
+        },
+
+        onImportFileSelected(event) {
+          const file = event?.target?.files?.[0];
+          this.importFile = file || null;
+          this.importStagingId = '';
+          this.importManifest = null;
+          this.importZipPassword = '';
+          this.importError = '';
+          this.importInfo = '';
+          this.importPhase = 'idle';
+        },
+
+        async probeImport() {
+          if (!this.importFile) {
+            this.importError = 'Pick a ZIP file first.';
+            return;
+          }
+          this.importError = '';
+          this.importInfo = '';
+          this.importPhase = 'probing';
+          try {
+            const url = '/setup/api/import/probe' + (this.importZipPassword
+              ? ('?password=' + encodeURIComponent(this.importZipPassword))
+              : '');
+            const res = await fetch(url, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'content-type': 'application/zip' },
+              body: this.importFile,
+            });
+            let payload = null;
+            try { payload = await res.json(); } catch { /* parse error */ }
+            if (res.status === 401 && payload?.needsPassword) {
+              this.importStagingId = payload.stagingId || '';
+              this.importPhase = 'awaiting-zip-password';
+              this.importError = '';
+              this.importInfo = payload.error || 'Enter the password used when this archive was exported.';
+              return;
+            }
+            if (!res.ok || !payload?.ok) {
+              this.importPhase = this.importZipPassword ? 'awaiting-zip-password' : 'idle';
+              this.importError = payload?.error || ('Probe failed (HTTP ' + res.status + ').');
+              return;
+            }
+            this.importStagingId = payload.stagingId;
+            this.importManifest = payload.manifest;
+            this.importPhase = 'awaiting-confirm';
+            this.importInfo = '';
+          } catch (e) {
+            this.importPhase = 'idle';
+            this.importError = 'Upload failed: ' + String(e);
+          }
+        },
+
+        async applyImport() {
+          if (!this.importStagingId) {
+            this.importError = 'No staged import — re-upload the file.';
+            return;
+          }
+          if (!this.importSetupPassword) {
+            this.importError = 'Re-enter your SETUP_PASSWORD to confirm.';
+            return;
+          }
+          this.importError = '';
+          this.importPhase = 'applying';
+          try {
+            const res = await fetch('/setup/api/import/apply', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                stagingId: this.importStagingId,
+                setupPassword: this.importSetupPassword,
+              }),
+            });
+            let payload = null;
+            try { payload = await res.json(); } catch { /* parse error */ }
+            if (!res.ok || !payload?.ok) {
+              this.importPhase = 'awaiting-confirm';
+              this.importError = payload?.error || ('Import failed (HTTP ' + res.status + ').');
+              return;
+            }
+            this.log = 'Import complete. Reloading...\n';
+            this.importInfo = 'Import complete. Reloading…';
+            setTimeout(() => window.location.reload(), 1000);
+          } catch (e) {
+            this.importPhase = 'awaiting-confirm';
+            this.importError = 'Apply request failed: ' + String(e);
           }
         },
 
@@ -999,6 +1115,13 @@
                       </svg>
                       View Logs
                     </a>
+                    <button @click="openImportModal()" :disabled="loading" class="btn btn-secondary w-full">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 8v8a3 3 0 003 3h10a3 3 0 003-3V8m-4 4l-4-4m0 0L8 8m4 4V4" />
+                      </svg>
+                      Import Data
+                    </button>
                   </section>
 
                   <!-- Danger Zone -->
@@ -1251,6 +1374,166 @@
             </span>
           </button>
           <button @click="showWipeModal = false" :disabled="wiping"
+            class="btn btn-secondary flex-1">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Data Modal -->
+    <div x-show="showImportModal" x-cloak class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto"
+      @click.self="closeImportModal()">
+      <div class="card w-full max-w-lg my-8 !border-[var(--color-border)]">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-[var(--color-accent)]/15 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-[var(--color-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 8v8a3 3 0 003 3h10a3 3 0 003-3V8m-4 4l-4-4m0 0L8 8m4 4V4" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold">Import data from another deployment</h3>
+        </div>
+
+        <!-- Format requirement notice (shown in idle/probing/awaiting-zip-password phases) -->
+        <div x-show="importPhase === 'idle' || importPhase === 'probing' || importPhase === 'awaiting-zip-password'"
+          class="bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3 mb-4 text-xs text-[var(--color-text-secondary)] leading-relaxed">
+          <strong class="text-[var(--color-text-primary)]">Compatible archive only.</strong> This works with ZIPs
+          produced by the <strong class="text-[var(--color-text-primary)]">Export Data</strong> button on this template
+          (or another deployment of it). The archive must contain
+          <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">data/.openclaw/openclaw.json</code>
+          and (optionally) <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">data/workspace</code>.
+          Custom backups in other layouts will not import.
+        </div>
+
+        <!-- File picker -->
+        <div x-show="importPhase === 'idle' || importPhase === 'probing'" class="mb-4">
+          <label class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">
+            Export ZIP file
+          </label>
+          <input type="file" accept=".zip,application/zip" @change="onImportFileSelected($event)"
+            class="block w-full text-sm text-[var(--color-text-secondary)]
+              file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0
+              file:text-xs file:font-medium file:cursor-pointer
+              file:bg-[var(--color-surface-overlay)] file:text-[var(--color-text-primary)]
+              hover:file:bg-[var(--color-border-muted)]" />
+          <p x-show="importFile" class="text-xs text-[var(--color-text-muted)] mt-1.5">
+            Selected: <span x-text="importFile?.name + ' (' + ((importFile?.size || 0) / 1048576).toFixed(2) + ' MB)'"></span>
+          </p>
+        </div>
+
+        <!-- ZIP password prompt (only when needed) -->
+        <div x-show="importPhase === 'awaiting-zip-password'" class="mb-4">
+          <div class="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 rounded-lg p-3 mb-3">
+            <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+              <strong class="text-[var(--color-warning)]">Password-protected archive.</strong>
+              Enter the <strong class="text-[var(--color-text-primary)]">SETUP_PASSWORD of the source deployment</strong>
+              (the one that exported this ZIP). It is not necessarily the same as this deployment's password.
+            </p>
+          </div>
+          <label class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">
+            Source deployment's SETUP_PASSWORD
+          </label>
+          <input x-model="importZipPassword" type="password" placeholder="Source export password"
+            class="input-field" @keydown.enter="probeImport()" />
+        </div>
+
+        <!-- Confirm phase: show manifest + DESTRUCTIVE warning + SETUP_PASSWORD field -->
+        <div x-show="importPhase === 'awaiting-confirm' || importPhase === 'applying'" class="mb-4 space-y-3">
+          <div class="bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3">
+            <p class="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-semibold mb-2">
+              About to import</p>
+            <dl class="space-y-1.5 text-sm">
+              <div class="flex justify-between">
+                <dt class="text-[var(--color-text-secondary)]">openclaw.json</dt>
+                <dd class="text-[var(--color-text-primary)] font-medium">
+                  <span x-show="importManifest?.hasOpenclawJson">✓ included</span>
+                  <span x-show="!importManifest?.hasOpenclawJson" class="text-[var(--color-danger)]">missing</span>
+                </dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-[var(--color-text-secondary)]">Chat sessions</dt>
+                <dd class="text-[var(--color-text-primary)] font-medium" x-text="(importManifest?.sessionCount ?? 0) + ' file' + ((importManifest?.sessionCount ?? 0) === 1 ? '' : 's')"></dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-[var(--color-text-secondary)]">Workspace</dt>
+                <dd class="text-[var(--color-text-primary)] font-medium">
+                  <span x-show="importManifest?.hasWorkspace">✓ included</span>
+                  <span x-show="!importManifest?.hasWorkspace" class="text-[var(--color-text-muted)]">none</span>
+                </dd>
+              </div>
+              <div x-show="importManifest?.sourceVersion" class="flex justify-between">
+                <dt class="text-[var(--color-text-secondary)]">Source version</dt>
+                <dd class="text-[var(--color-text-primary)] font-medium" x-text="importManifest?.sourceVersion"></dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/40 rounded-lg p-3">
+            <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+              <strong class="text-[var(--color-danger)]">This permanently REPLACES all existing data</strong> on this
+              deployment — including <strong class="text-[var(--color-text-primary)]">all current chat history</strong>,
+              configuration, agent memory, OAuth credentials, and workspace files. Recovery is not possible.
+            </p>
+          </div>
+
+          <div class="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 rounded-lg p-3">
+            <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+              <strong class="text-[var(--color-warning)]">Want to keep your current chats?</strong> Cancel this dialog,
+              click <strong class="text-[var(--color-text-primary)]">Export Data</strong> to back up first, then come
+              back to import.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">
+              Re-enter <strong class="text-[var(--color-text-primary)] normal-case">this deployment's SETUP_PASSWORD</strong> to confirm
+            </label>
+            <input x-model="importSetupPassword" type="password" placeholder="THIS deployment's SETUP_PASSWORD"
+              class="input-field" :disabled="importPhase === 'applying'"
+              @keydown.enter="applyImport()" />
+          </div>
+        </div>
+
+        <div x-show="importError"
+          class="mb-4 text-xs text-[var(--color-danger)] bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 rounded-lg p-3"
+          x-text="importError"></div>
+        <div x-show="importInfo && !importError"
+          class="mb-4 text-xs text-[var(--color-text-secondary)] bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3"
+          x-text="importInfo"></div>
+
+        <!-- Action buttons (vary by phase) -->
+        <div class="flex gap-3 pt-2">
+          <!-- Idle: show Upload & Probe -->
+          <button x-show="importPhase === 'idle'" @click="probeImport()" :disabled="!importFile"
+            class="btn btn-primary flex-1">Upload &amp; check</button>
+
+          <!-- Probing: show spinner -->
+          <button x-show="importPhase === 'probing'" disabled class="btn btn-primary flex-1">
+            <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Uploading…
+          </button>
+
+          <!-- Awaiting zip password: show Try password -->
+          <button x-show="importPhase === 'awaiting-zip-password'" @click="probeImport()"
+            :disabled="!importZipPassword"
+            class="btn btn-primary flex-1">Try password</button>
+
+          <!-- Awaiting confirm or applying -->
+          <button x-show="importPhase === 'awaiting-confirm'" @click="applyImport()"
+            :disabled="!importSetupPassword"
+            class="btn btn-danger-solid flex-1">I understand — replace all data</button>
+
+          <button x-show="importPhase === 'applying'" disabled class="btn btn-danger-solid flex-1">
+            <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Applying…
+          </button>
+
+          <button @click="closeImportModal()" :disabled="importPhase === 'applying'"
             class="btn btn-secondary flex-1">Cancel</button>
         </div>
       </div>

@@ -8,7 +8,7 @@ src_ref
 CLAUDE.md
 oc_main
 todos.md
-
+data/
 
 # Build artifacts
 /dist

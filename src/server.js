@@ -241,6 +241,189 @@ function describeDeviceApprovalForbidden(result) {
   }
 }
 
+const IMPORT_STAGING_ROOT = path.join(STATE_DIR, ".import-staging");
+const IMPORT_ROLLBACK_DIR = path.join(STATE_DIR, ".import-rollback");
+const IMPORT_STAGE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+function importStagingPath(stagingId) {
+  // stagingId is a hex string we generate; never trust caller-supplied values into a path otherwise
+  if (!/^[a-f0-9]{16,64}$/.test(String(stagingId || ""))) return null;
+  return path.join(IMPORT_STAGING_ROOT, stagingId);
+}
+
+function cleanupStaleImportStages() {
+  try {
+    if (!fs.existsSync(IMPORT_STAGING_ROOT)) return;
+    const now = Date.now();
+    for (const entry of fs.readdirSync(IMPORT_STAGING_ROOT)) {
+      const full = path.join(IMPORT_STAGING_ROOT, entry);
+      try {
+        const stat = fs.statSync(full);
+        if (now - stat.mtimeMs > IMPORT_STAGE_TTL_MS) {
+          fs.rmSync(full, { recursive: true, force: true });
+        }
+      } catch { /* ignore individual entry errors */ }
+    }
+  } catch { /* best-effort */ }
+}
+
+function detectZipPasswordError(stderr, code) {
+  const text = String(stderr || "").toLowerCase();
+  if (
+    text.includes("incorrect password") ||
+    text.includes("password incorrect") ||
+    text.includes("password required") ||
+    text.includes("encrypted") ||
+    text.includes("password needed") ||
+    text.includes("skipped (incorrect password)")
+  ) {
+    return true;
+  }
+  // unzip(1) historically returns 82 for a password error on extract.
+  return code === 82;
+}
+
+async function probeZipNeedsPassword(zipFile, password) {
+  // -t = test only (no extraction). -P "<pwd>" provides password without prompt.
+  // Trying with the supplied password (or empty string when not provided).
+  const result = await runCmd("unzip", ["-t", "-P", password ?? "", zipFile]);
+  if (result.code === 0) return { ok: true };
+  if (detectZipPasswordError(result.output, result.code)) {
+    return { ok: false, needsPassword: true, output: result.output };
+  }
+  return { ok: false, needsPassword: false, output: result.output };
+}
+
+async function extractZipTo(zipFile, password, destDir) {
+  fs.mkdirSync(destDir, { recursive: true });
+  const result = await runCmd("unzip", [
+    "-qq",
+    "-o",
+    "-P",
+    password ?? "",
+    zipFile,
+    "-d",
+    destDir,
+  ]);
+  if (result.code !== 0) {
+    return { ok: false, output: result.output };
+  }
+  return { ok: true };
+}
+
+function findStagedDataRoot(stageDir) {
+  // We expect the export's layout to be `data/.openclaw/...` and `data/workspace/...`.
+  // Some `zip` invocations might preserve a leading slash → starts with an empty dir; check both.
+  const candidates = [
+    path.join(stageDir, "data"),
+    stageDir, // fallback if user re-zipped with no leading "data/"
+  ];
+  for (const candidate of candidates) {
+    const stateCheck = path.join(candidate, ".openclaw", "openclaw.json");
+    if (fs.existsSync(stateCheck)) {
+      return {
+        ok: true,
+        dataRoot: candidate,
+        stateDir: path.join(candidate, ".openclaw"),
+        workspaceDir: path.join(candidate, "workspace"),
+      };
+    }
+  }
+  return { ok: false };
+}
+
+function summarizeStagedImport(stateDirPath, workspaceDirPath) {
+  const summary = {
+    hasOpenclawJson: false,
+    hasWorkspace: false,
+    sessionCount: 0,
+    sourceVersion: null,
+    importedSize: 0,
+  };
+  const cfgPath = path.join(stateDirPath, "openclaw.json");
+  if (fs.existsSync(cfgPath)) {
+    summary.hasOpenclawJson = true;
+    try {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+      summary.sourceVersion = cfg?.meta?.version ?? cfg?.version ?? null;
+    } catch { /* invalid JSON is reported elsewhere */ }
+  }
+  if (fs.existsSync(workspaceDirPath)) {
+    summary.hasWorkspace = true;
+  }
+  const sessionsDir = path.join(stateDirPath, "agents", "main", "sessions");
+  if (fs.existsSync(sessionsDir)) {
+    try {
+      summary.sessionCount = fs
+        .readdirSync(sessionsDir)
+        .filter((n) => n.endsWith(".jsonl") && !n.includes(".bak.")).length;
+    } catch { /* ignore */ }
+  }
+  return summary;
+}
+
+function applyDeploymentFixesToStaged(stagedStateDir) {
+  // Files we never want to inherit from the source deployment:
+  const dropPaths = [
+    "gateway.token",          // wrapper-managed, must be the destination's token
+    "identity",               // CLI keypair tied to source's pairing scope
+    "devices",                // paired browsers from another deployment
+    "tui",                    // stale TUI session state
+    "tasks",                  // stale runtime task state
+    "wrapper.log",            // logs from the source wrapper
+    ".import-staging",        // any staging dir from the source (paranoia)
+    ".import-rollback",
+  ];
+  for (const rel of dropPaths) {
+    const full = path.join(stagedStateDir, rel);
+    try {
+      fs.rmSync(full, { recursive: true, force: true });
+    } catch { /* best-effort */ }
+  }
+
+  // Patch openclaw.json so gateway settings match THIS deployment.
+  const cfgPath = path.join(stagedStateDir, "openclaw.json");
+  if (!fs.existsSync(cfgPath)) {
+    throw new Error("Staged openclaw.json missing — cannot apply deployment fixes.");
+  }
+  let cfg;
+  try {
+    cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  } catch (err) {
+    throw new Error(`Staged openclaw.json is not valid JSON: ${err.message}`);
+  }
+  cfg.gateway = cfg.gateway || {};
+  cfg.gateway.auth = cfg.gateway.auth || {};
+  cfg.gateway.auth.mode = "token";
+  cfg.gateway.auth.token = OPENCLAW_GATEWAY_TOKEN;
+  cfg.gateway.bind = "loopback";
+  cfg.gateway.port = INTERNAL_GATEWAY_PORT;
+  cfg.gateway.trustedProxies = ["127.0.0.1"];
+  cfg.gateway.controlUi = cfg.gateway.controlUi || {};
+  cfg.gateway.controlUi.allowInsecureAuth = true;
+  // Drop the imported allowedOrigins; syncAllowedOrigins() will repopulate at startup.
+  delete cfg.gateway.controlUi.allowedOrigins;
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+}
+
+function copyDirInto(srcDir, dstDir) {
+  fs.mkdirSync(dstDir, { recursive: true });
+  if (typeof fs.cpSync === "function") {
+    fs.cpSync(srcDir, dstDir, { recursive: true, force: true, dereference: false });
+  } else {
+    // Fallback for older Node — should not be hit on Node 22.
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      const src = path.join(srcDir, entry.name);
+      const dst = path.join(dstDir, entry.name);
+      if (entry.isDirectory()) {
+        copyDirInto(src, dst);
+      } else {
+        fs.copyFileSync(src, dst);
+      }
+    }
+  }
+}
+
 function configPath() {
   return (
     process.env.OPENCLAW_CONFIG_PATH?.trim() ||
@@ -1395,6 +1578,280 @@ app.post("/setup/api/wipe", requireSetupAuth, async (req, res) => {
       error: `Wipe failed: ${err?.message || String(err)}`,
     });
   }
+});
+
+const IMPORT_BODY_LIMIT = process.env.IMPORT_MAX_BYTES || "500mb";
+
+app.post(
+  "/setup/api/import/probe",
+  requireSetupAuth,
+  express.raw({
+    type: ["application/zip", "application/octet-stream"],
+    limit: IMPORT_BODY_LIMIT,
+  }),
+  async (req, res) => {
+    if (!req.body || !req.body.length) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "No file received in request body." });
+    }
+    cleanupStaleImportStages();
+    const stagingId = crypto.randomBytes(16).toString("hex");
+    const stageDir = importStagingPath(stagingId);
+    const zipFile = path.join(IMPORT_STAGING_ROOT, `${stagingId}.zip`);
+    const zipPassword = typeof req.query?.password === "string" ? req.query.password : "";
+
+    try {
+      fs.mkdirSync(IMPORT_STAGING_ROOT, { recursive: true });
+      fs.writeFileSync(zipFile, req.body);
+
+      const probe = await probeZipNeedsPassword(zipFile, zipPassword);
+      if (!probe.ok) {
+        if (probe.needsPassword) {
+          // Keep the upload around so the user can submit a password without re-uploading.
+          return res.status(401).json({
+            ok: false,
+            needsPassword: true,
+            stagingId,
+            error:
+              "This archive is password-protected. Enter the export password to continue.",
+          });
+        }
+        // Bad zip: clean up immediately.
+        try { fs.rmSync(zipFile, { force: true }); } catch { /* */ }
+        return res.status(400).json({
+          ok: false,
+          error: "Could not read this archive. Make sure it's a valid OpenClaw export ZIP.",
+          output: probe.output?.slice(-2000),
+        });
+      }
+
+      const extract = await extractZipTo(zipFile, zipPassword, stageDir);
+      if (!extract.ok) {
+        try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch { /* */ }
+        try { fs.rmSync(zipFile, { force: true }); } catch { /* */ }
+        return res.status(400).json({
+          ok: false,
+          error: "Failed to extract archive contents.",
+          output: extract.output?.slice(-2000),
+        });
+      }
+
+      const layout = findStagedDataRoot(stageDir);
+      if (!layout.ok) {
+        try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch { /* */ }
+        try { fs.rmSync(zipFile, { force: true }); } catch { /* */ }
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Archive does not match the expected layout (data/.openclaw/openclaw.json). Imports only work with exports from this template.",
+        });
+      }
+
+      const manifest = summarizeStagedImport(layout.stateDir, layout.workspaceDir);
+
+      // Persist the resolved layout next to the staged data so /apply can find it without re-scanning.
+      fs.writeFileSync(
+        path.join(stageDir, ".staging-meta.json"),
+        JSON.stringify(
+          {
+            stagingId,
+            zipFile,
+            stateDir: layout.stateDir,
+            workspaceDir: layout.workspaceDir,
+            manifest,
+          },
+          null,
+          2,
+        ),
+      );
+
+      // The zip can be removed now — extracted data is what we'll apply.
+      try { fs.rmSync(zipFile, { force: true }); } catch { /* */ }
+
+      serverLog.info(
+        "import",
+        `staged ${stagingId} sessions=${manifest.sessionCount} workspace=${manifest.hasWorkspace}`,
+      );
+      return res.json({ ok: true, stagingId, manifest });
+    } catch (err) {
+      try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch { /* */ }
+      try { fs.rmSync(zipFile, { force: true }); } catch { /* */ }
+      serverLog.error("import", `probe failed: ${err.message || String(err)}`);
+      return res
+        .status(500)
+        .json({ ok: false, error: `Probe failed: ${err.message || String(err)}` });
+    }
+  },
+);
+
+app.post("/setup/api/import/apply", requireSetupAuth, async (req, res) => {
+  const stagingId = String(req.body?.stagingId || "");
+  const provided = String(req.body?.setupPassword ?? "");
+  const expected = SETUP_PASSWORD ?? "";
+  const providedBuf = Buffer.from(provided, "utf8");
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const passwordOk =
+    expected.length > 0 &&
+    providedBuf.length === expectedBuf.length &&
+    crypto.timingSafeEqual(providedBuf, expectedBuf);
+
+  if (!passwordOk) {
+    return res.status(401).json({
+      ok: false,
+      error: "Setup password did not match. Import aborted (no data was changed).",
+    });
+  }
+
+  const stageDir = importStagingPath(stagingId);
+  if (!stageDir || !fs.existsSync(stageDir)) {
+    return res.status(404).json({
+      ok: false,
+      error: "Staged import not found or expired. Re-upload the archive and try again.",
+    });
+  }
+
+  const metaPath = path.join(stageDir, ".staging-meta.json");
+  let stagedStateDir, stagedWorkspaceDir;
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+    stagedStateDir = meta.stateDir;
+    stagedWorkspaceDir = meta.workspaceDir;
+    if (!fs.existsSync(stagedStateDir)) {
+      throw new Error("Staged .openclaw directory missing.");
+    }
+  } catch (err) {
+    return res.status(500).json({
+      ok: false,
+      error: `Could not read staging metadata: ${err.message}`,
+    });
+  }
+
+  const rollbackId = crypto.randomBytes(8).toString("hex");
+  const rollbackBase = `${IMPORT_ROLLBACK_DIR}.${rollbackId}`;
+  const rollbackState = `${rollbackBase}.state`;
+  const rollbackWorkspace = `${rollbackBase}.workspace`;
+  let rolledBack = false;
+  let stagedFixesApplied = false;
+
+  serverLog.warn("import", `apply ${stagingId} starting — replacing live data`);
+
+  // Stop the gateway so we can safely swap directories.
+  intentionallyRestarting = true;
+  if (gatewayProc) {
+    try {
+      gatewayProc.kill("SIGTERM");
+      await Promise.race([
+        new Promise((resolve) => gatewayProc.on("exit", resolve)),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+      if (gatewayProc && !gatewayProc.killed) gatewayProc.kill("SIGKILL");
+    } catch { /* */ }
+    gatewayProc = null;
+  }
+  try {
+    await Promise.race([
+      runCmd(OPENCLAW_NODE, clawArgs(["gateway", "stop"])),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch { /* */ }
+
+  try {
+    // Apply deployment-specific fixes to the STAGED data BEFORE we touch live state.
+    // If this fails, no destructive change has happened yet.
+    applyDeploymentFixesToStaged(stagedStateDir);
+    stagedFixesApplied = true;
+
+    // Snapshot live data into rollback dirs (atomic rename), then point live dirs at staged data.
+    if (fs.existsSync(STATE_DIR)) {
+      fs.renameSync(STATE_DIR, rollbackState);
+    }
+    if (fs.existsSync(WORKSPACE_DIR)) {
+      fs.renameSync(WORKSPACE_DIR, rollbackWorkspace);
+    }
+
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+    copyDirInto(stagedStateDir, STATE_DIR);
+    if (fs.existsSync(stagedWorkspaceDir)) {
+      copyDirInto(stagedWorkspaceDir, WORKSPACE_DIR);
+    }
+
+    // Re-write the wrapper's gateway.token file so future restarts use it.
+    try {
+      fs.writeFileSync(path.join(STATE_DIR, "gateway.token"), OPENCLAW_GATEWAY_TOKEN, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+    } catch (err) {
+      serverLog.warn(
+        "import",
+        `could not persist gateway.token after import: ${err.message}`,
+      );
+    }
+
+    // Cleanup staging.
+    try { fs.rmSync(stageDir, { recursive: true, force: true }); } catch { /* */ }
+
+    // Cache invalidation.
+    cachedOpenclawVersion = null;
+    cachedChannelsHelp = null;
+    consecutiveRestartCount = 0;
+
+    serverLog.warn("import", `apply ${stagingId} complete — restarting gateway`);
+  } catch (err) {
+    serverLog.error("import", `apply failed: ${err.message || String(err)}`);
+    // Roll back if we got far enough to disturb live dirs.
+    try {
+      if (fs.existsSync(rollbackState)) {
+        fs.rmSync(STATE_DIR, { recursive: true, force: true });
+        fs.renameSync(rollbackState, STATE_DIR);
+      }
+      if (fs.existsSync(rollbackWorkspace)) {
+        fs.rmSync(WORKSPACE_DIR, { recursive: true, force: true });
+        fs.renameSync(rollbackWorkspace, WORKSPACE_DIR);
+      }
+      rolledBack = true;
+    } catch (rollbackErr) {
+      serverLog.error(
+        "import",
+        `rollback failed too — manual recovery required: ${rollbackErr.message}`,
+      );
+    }
+    intentionallyRestarting = false;
+    if (isConfigured()) {
+      ensureGatewayRunning().catch((restartErr) => {
+        serverLog.error(
+          "import",
+          `gateway restart after failed import: ${restartErr.message}`,
+        );
+      });
+    }
+    return res.status(500).json({
+      ok: false,
+      error: `Import failed: ${err.message || String(err)}${
+        rolledBack ? " (existing data was restored)" : " (rollback may be needed)"
+      }`,
+      stagedFixesApplied,
+    });
+  }
+
+  // Successful path: clean up rollback snapshots and bring the gateway back up.
+  intentionallyRestarting = false;
+  try { fs.rmSync(rollbackState, { recursive: true, force: true }); } catch { /* */ }
+  try { fs.rmSync(rollbackWorkspace, { recursive: true, force: true }); } catch { /* */ }
+
+  if (isConfigured()) {
+    ensureGatewayRunning().catch((err) => {
+      serverLog.error("import", `gateway restart after import: ${err.message}`);
+    });
+  }
+
+  return res.json({
+    ok: true,
+    output: "Import complete. Reload the page to use the imported configuration.",
+  });
 });
 
 app.post("/setup/api/doctor", requireSetupAuth, async (_req, res) => {

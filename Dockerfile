@@ -10,6 +10,7 @@ RUN apt-get update \
     python3 \
     build-essential \
     zip \
+    unzip \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
