@@ -1324,6 +1324,79 @@ app.post("/setup/api/reset", requireSetupAuth, async (_req, res) => {
   }
 });
 
+app.post("/setup/api/wipe", requireSetupAuth, async (req, res) => {
+  const provided = String(req.body?.password ?? "");
+  const expected = SETUP_PASSWORD ?? "";
+  const providedBuf = Buffer.from(provided, "utf8");
+  const expectedBuf = Buffer.from(expected, "utf8");
+  const passwordOk =
+    expected.length > 0 &&
+    providedBuf.length === expectedBuf.length &&
+    crypto.timingSafeEqual(providedBuf, expectedBuf);
+
+  if (!passwordOk) {
+    return res.status(401).json({
+      ok: false,
+      error: "Setup password did not match. Wipe aborted.",
+    });
+  }
+
+  try {
+    serverLog.warn("wrapper", "wipe requested — stopping gateway and clearing all data");
+    shuttingDown = false;
+    intentionallyRestarting = true;
+    if (gatewayProc) {
+      try {
+        gatewayProc.kill("SIGTERM");
+        await Promise.race([
+          new Promise((resolve) => gatewayProc.on("exit", resolve)),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
+        if (gatewayProc && !gatewayProc.killed) gatewayProc.kill("SIGKILL");
+      } catch {
+        /* best-effort */
+      }
+      gatewayProc = null;
+    }
+    try {
+      await Promise.race([
+        runCmd(OPENCLAW_NODE, clawArgs(["gateway", "stop"])),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch {
+      /* best-effort */
+    }
+
+    const wipeDirContents = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      for (const entry of fs.readdirSync(dir)) {
+        fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+      }
+    };
+    wipeDirContents(STATE_DIR);
+    wipeDirContents(WORKSPACE_DIR);
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+    cachedOpenclawVersion = null;
+    cachedChannelsHelp = null;
+    intentionallyRestarting = false;
+    consecutiveRestartCount = 0;
+
+    serverLog.warn("wrapper", "wipe complete — all data cleared");
+    return res.json({
+      ok: true,
+      output: "All data cleared. Reload the page to start fresh.",
+    });
+  } catch (err) {
+    serverLog.error("wrapper", `wipe failed: ${err?.message || String(err)}`);
+    return res.status(500).json({
+      ok: false,
+      error: `Wipe failed: ${err?.message || String(err)}`,
+    });
+  }
+});
+
 app.post("/setup/api/doctor", requireSetupAuth, async (_req, res) => {
   const args = ["doctor", "--non-interactive", "--repair"];
   const result = await runCmd(OPENCLAW_NODE, clawArgs(args));

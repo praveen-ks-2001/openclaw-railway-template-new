@@ -45,6 +45,10 @@
     .btn-secondary:hover:not(:disabled) { background: var(--color-border-muted); }
     .btn-danger { background: transparent; color: var(--color-danger); border: 1px solid var(--color-danger); }
     .btn-danger:hover:not(:disabled) { background: var(--color-danger); color: #fff; }
+    .btn-danger-solid { background: var(--color-danger); color: #fff; }
+    .btn-danger-solid:hover:not(:disabled) { background: #d8463d; }
+    .btn-warning { background: transparent; color: var(--color-warning); border: 1px solid var(--color-warning); }
+    .btn-warning:hover:not(:disabled) { background: var(--color-warning); color: #1a1407; }
     .btn-success { background: #238636; color: #fff; }
     .btn-success:hover:not(:disabled) { background: #2ea043; }
     .btn-tui { background: #6e40c9; color: #fff; }
@@ -93,6 +97,10 @@
         loginCode: '',
         setupStreamTail: '',
         setupError: '',
+        showWipeModal: false,
+        wipePassword: '',
+        wipeError: '',
+        wiping: false,
         customBaseUrl: '',
         customModelId: '',
         customCompatibility: 'openai',
@@ -330,8 +338,8 @@
         },
 
         async resetSetup() {
-          if (!confirm('Reset setup? This deletes the config file so onboarding can run again.')) return;
-          this.log = 'Resetting...\n';
+          if (!confirm('Reset configuration? This deletes openclaw.json so you can re-run setup. Chat history, credentials, and paired devices stay intact.')) return;
+          this.log = 'Resetting configuration...\n';
           this.loading = true;
 
           try {
@@ -343,6 +351,43 @@
             this.log += 'Error: ' + String(e) + '\n';
           } finally {
             this.loading = false;
+          }
+        },
+
+        openWipeModal() {
+          this.wipePassword = '';
+          this.wipeError = '';
+          this.showWipeModal = true;
+        },
+
+        async wipeData() {
+          this.wipeError = '';
+          if (!this.wipePassword) {
+            this.wipeError = 'Enter your SETUP_PASSWORD to confirm.';
+            return;
+          }
+          this.wiping = true;
+          try {
+            const res = await fetch('/setup/api/wipe', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ password: this.wipePassword }),
+            });
+            let payload = null;
+            try { payload = await res.json(); } catch { /* ignore parse error */ }
+            if (!res.ok || !payload?.ok) {
+              this.wipeError = payload?.error || 'Wipe failed (HTTP ' + res.status + ').';
+              return;
+            }
+            this.log = 'All data wiped. Reloading...\n';
+            this.showWipeModal = false;
+            this.wipePassword = '';
+            setTimeout(() => window.location.reload(), 800);
+          } catch (e) {
+            this.wipeError = 'Wipe request failed: ' + String(e);
+          } finally {
+            this.wiping = false;
           }
         },
 
@@ -957,12 +1002,42 @@
                   </section>
 
                   <!-- Danger Zone -->
-                  <section class="card !border-[var(--color-danger)]/30">
-                    <h3 class="text-sm font-semibold text-[var(--color-danger)] mb-2">Danger Zone</h3>
-                    <p class="text-xs text-[var(--color-text-secondary)] mb-3">Deletes the config file so you can run
-                      setup again from scratch.</p>
-                    <button @click="resetSetup()" :disabled="loading" class="btn btn-danger w-full text-sm">Reset
-                      Setup</button>
+                  <section class="card !border-[var(--color-warning)]/40 space-y-5">
+                    <h3 class="text-sm font-semibold text-[var(--color-danger)]">Danger Zone</h3>
+
+                    <!-- Reset Configuration (yellow / amber) -->
+                    <div class="border border-[var(--color-warning)]/30 rounded-lg p-3">
+                      <p class="text-xs uppercase tracking-widest text-[var(--color-warning)] font-semibold mb-1.5">
+                        Reset configuration</p>
+                      <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed mb-3">
+                        Deletes <code
+                          class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">openclaw.json</code>
+                        so you can re-run the setup wizard with a different provider, model, or channels.
+                        <br /><br />
+                        <strong class="text-[var(--color-text-primary)]">Preserved:</strong> chat history, agent memory,
+                        OAuth credentials, paired devices, gateway token. Re-running setup will pick them up again.
+                      </p>
+                      <button @click="resetSetup()" :disabled="loading"
+                        class="btn btn-warning w-full text-sm">Reset configuration</button>
+                    </div>
+
+                    <!-- Wipe All Data (red, destructive) -->
+                    <div class="border border-[var(--color-danger)]/40 rounded-lg p-3 bg-[var(--color-danger)]/5">
+                      <p class="text-xs uppercase tracking-widest text-[var(--color-danger)] font-semibold mb-1.5">
+                        Wipe all data</p>
+                      <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed mb-3">
+                        Permanently deletes everything under your data volume — config, <strong
+                          class="text-[var(--color-text-primary)]">all chat history</strong>, agent memory, OAuth
+                        credentials, paired devices, workspace files. The container restarts blank.
+                        <br /><br />
+                        <strong class="text-[var(--color-danger)]">This cannot be undone.</strong> If you might want
+                        your chats later, click <strong
+                          class="text-[var(--color-text-primary)]">Export Data</strong> first — once wiped, recovery is
+                        not possible.
+                      </p>
+                      <button @click="openWipeModal()" :disabled="loading"
+                        class="btn btn-danger-solid w-full text-sm">Wipe all data…</button>
+                    </div>
                   </section>
                 </div>
               </div>
@@ -1117,6 +1192,66 @@
             <button @click="approvePairing()" class="btn btn-primary flex-1">Approve</button>
             <button @click="showPairingModal = false" class="btn btn-secondary flex-1">Cancel</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wipe All Data Modal -->
+    <div x-show="showWipeModal" x-cloak class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+      @click.self="if (!wiping) showWipeModal = false">
+      <div class="card w-full max-w-md mx-4 !border-[var(--color-danger)]/50">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-[var(--color-danger)]/15 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-[var(--color-danger)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-[var(--color-danger)]">Wipe all data</h3>
+        </div>
+
+        <div class="bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/30 rounded-lg p-3 mb-4">
+          <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+            <strong class="text-[var(--color-text-primary)]">This permanently deletes everything</strong> under
+            <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded">/data</code>: config, all
+            chat history, agent memory, OAuth credentials, paired devices, and workspace files. Recovery is
+            <strong class="text-[var(--color-danger)]">not possible</strong>.
+          </p>
+        </div>
+
+        <div class="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30 rounded-lg p-3 mb-4">
+          <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+            <strong class="text-[var(--color-warning)]">Want to keep your chats?</strong> Cancel this dialog, click
+            <strong class="text-[var(--color-text-primary)]">Export Data</strong> first to save a password-protected
+            backup, then come back.
+          </p>
+        </div>
+
+        <label class="block text-xs uppercase tracking-wide text-[var(--color-text-muted)] font-medium mb-2">
+          Re-enter your <code class="text-[10px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded normal-case">SETUP_PASSWORD</code>
+          to confirm
+        </label>
+        <input x-model="wipePassword" type="password" placeholder="SETUP_PASSWORD"
+          class="input-field"
+          @keydown.enter="wipeData()" />
+        <div x-show="wipeError"
+          class="mt-2 text-xs text-[var(--color-danger)]"
+          x-text="wipeError"></div>
+
+        <div class="flex gap-3 pt-5">
+          <button @click="wipeData()" :disabled="wiping || !wipePassword"
+            class="btn btn-danger-solid flex-1">
+            <span x-show="!wiping">I understand — wipe everything</span>
+            <span x-show="wiping" class="flex items-center gap-2">
+              <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Wiping…
+            </span>
+          </button>
+          <button @click="showWipeModal = false" :disabled="wiping"
+            class="btn btn-secondary flex-1">Cancel</button>
         </div>
       </div>
     </div>
