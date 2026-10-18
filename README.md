@@ -7,6 +7,12 @@ OpenClaw is a powerful AI agent framework that enables you to run Claude, GPT, o
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/openclaw-prev-clawdbot-moltbot-self-host?referralCode=QXdhdr&utm_medium=integration&utm_source=template&utm_campaign=generic)
 
+## OpenClaw Version
+
+This branch pins **OpenClaw 2026.6.6** in `package.json`. Railway version variables, including an existing `OPENCLAW_VERSION`, are ignored. Select the corresponding release branch in Railway to change versions.
+
+An installation already migrated by a newer release also needs a compatible pre-upgrade data backup before downgrading. Switching branches does not reverse database changes, and the old backup does not contain subsequent chats or edits.
+
 ## 🚀 Quick Start Deployment Guide
 
 ### Step 1: Deploy on Railway

@@ -11,6 +11,14 @@ import httpProxy from "http-proxy";
 import pty from "node-pty";
 import { WebSocketServer } from "ws";
 
+const PINNED_OPENCLAW_VERSION = JSON.parse(
+  fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).openclawVersion;
+if (typeof PINNED_OPENCLAW_VERSION !== "string" || !/^\d{4}\.\d+\.\d+$/.test(PINNED_OPENCLAW_VERSION))
+  throw new Error("package.json must pin an exact OpenClaw release in openclawVersion");
+process.env.OPENCLAW_VERSION = PINNED_OPENCLAW_VERSION;
+process.env.OPENCLAW_NO_AUTO_UPDATE = "1";
+
 const PORT = Number.parseInt(process.env.PORT ?? "8080", 10);
 const STATE_DIR =
   process.env.OPENCLAW_STATE_DIR?.trim() ||
@@ -75,6 +83,14 @@ const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}
 const OPENCLAW_ENTRY =
   process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
+const OPENCLAW_ROOT = path.dirname(path.dirname(path.resolve(OPENCLAW_ENTRY)));
+function installedVersion() {
+  return JSON.parse(
+    fs.readFileSync(path.join(OPENCLAW_ROOT, "package.json"), "utf8"),
+  ).version;
+}
+if (installedVersion() !== PINNED_OPENCLAW_VERSION)
+  throw new Error("Installed OpenClaw does not match this branch's pinned release; run the container entrypoint to install it");
 
 const ENABLE_WEB_TUI = process.env.ENABLE_WEB_TUI?.toLowerCase() === "true";
 const TUI_IDLE_TIMEOUT_MS = Number.parseInt(
@@ -1134,14 +1150,14 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     authGroups: AUTH_GROUPS_PUBLIC,
     tuiEnabled: ENABLE_WEB_TUI,
     gatewayToken: OPENCLAW_GATEWAY_TOKEN,
-    // Version compatibility floor: entrypoint.sh bumps an older requested
-    // OPENCLAW_VERSION up to OPENCLAW_MINIMUM_VERSION before install and records
-    // the original request here so the wizard can explain the bump.
     versionInfo: {
-      requested: process.env.OPENCLAW_REQUESTED_VERSION || null,
-      effective: process.env.OPENCLAW_VERSION || null,
-      minimum: process.env.OPENCLAW_MINIMUM_VERSION || null,
-      bumped: process.env.OPENCLAW_VERSION_BUMPED === "true",
+      pinned: PINNED_OPENCLAW_VERSION,
+      effective: installedVersion(),
+      source: "branch",
+      // Preserve the old read-only response keys without trusting env input.
+      requested: null,
+      minimum: PINNED_OPENCLAW_VERSION,
+      bumped: false,
     },
   });
 });
