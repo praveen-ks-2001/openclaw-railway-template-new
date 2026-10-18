@@ -4,20 +4,25 @@
   "type": "module",
   "packageManager": "pnpm@10.12.4",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.16.0 <25 || >=26.1.0"
   },
   "scripts": {
     "dev": "node src/server.js",
     "start": "node src/server.js",
-    "lint": "node -c src/server.js"
+    "lint": "node --check src/server.js",
+    "test": "node --test src/*.test.mjs scripts/*.test.mjs",
+    "test:openclaw": "node scripts/real-openclaw-smoke.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
     "http-proxy": "^1.18.1",
+    "json5": "^2.2.3",
     "node-pty": "^1.0.0",
     "ws": "^8.18.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["node-pty"]
+    "onlyBuiltDependencies": [
+      "node-pty"
+    ]
   }
 }

@@ -279,8 +279,8 @@
           //   URL: https://auth.openai.com/codex/device
           //   Code: MPON-M64WT
           // Prefer the URL after a "URL:" label; fall back to known auth hosts.
-          const urlByLabel = text.match(/\bURL:\s*(https:\/\/[^\s)\]│]+)/i);
-          const urlByHost = text.match(/https:\/\/(?:auth\.openai\.com|chatgpt\.com|chat\.openai\.com|[a-z0-9.]*x\.ai|[a-z0-9.]*grok\.com)\/[^\s)\]│]*/i);
+          const urlByLabel = text.match(/\bURL:\s*<?(https:\/\/[^\s<>\)\]│]+)/i);
+          const urlByHost = text.match(/https:\/\/(?:auth\.openai\.com|chatgpt\.com|chat\.openai\.com|[a-z0-9.]*x\.ai|[a-z0-9.]*grok\.com)\/[^\s<>\)\]│]*/i);
           const url = (urlByLabel && urlByLabel[1]) || (urlByHost && urlByHost[0]);
           if (url) this.loginUrl = url;
           // Require the "Code:"/"User code:" label WITH a colon and match an
@@ -434,13 +434,11 @@
           this.importInfo = '';
           this.importPhase = 'probing';
           try {
-            const url = '/setup/api/import/probe' + (this.importZipPassword
-              ? ('?password=' + encodeURIComponent(this.importZipPassword))
-              : '');
+            const url = '/setup/api/import/probe';
             const res = await fetch(url, {
               method: 'POST',
               credentials: 'same-origin',
-              headers: { 'content-type': 'application/zip' },
+              headers: { 'content-type': 'application/zip', ...(this.importZipPassword ? { 'X-Archive-Password': btoa(unescape(encodeURIComponent(this.importZipPassword))) } : {}) },
               body: this.importFile,
             });
             let payload = null;
@@ -759,7 +757,7 @@
           <div class="mt-4 p-3 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30">
             <p class="text-[11px] uppercase tracking-widest text-[var(--color-warning)] font-semibold mb-1.5">Heads up</p>
             <p class="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
-              This template is pinned to OpenClaw <strong class="text-[var(--color-text-primary)]">2026.6.6</strong>. To run a different release, set <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code> in your Railway env vars (overrides the Dockerfile default).
+              This template is pinned to OpenClaw <strong class="text-[var(--color-text-primary)]">2026.10.4</strong>. To run a different release, set <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code> in your Railway env vars (overrides the Dockerfile default).
             </p>
           </div>
 
@@ -1526,7 +1524,7 @@
               </div>
               <div class="flex justify-between">
                 <dt class="text-[var(--color-text-secondary)]">Chat sessions</dt>
-                <dd class="text-[var(--color-text-primary)] font-medium" x-text="(importManifest?.sessionCount ?? 0) + ' file' + ((importManifest?.sessionCount ?? 0) === 1 ? '' : 's')"></dd>
+                <dd class="text-[var(--color-text-primary)] font-medium" x-text="(importManifest?.sessionCount ?? 0) + ' session' + ((importManifest?.sessionCount ?? 0) === 1 ? '' : 's')"></dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-[var(--color-text-secondary)]">Workspace</dt>
