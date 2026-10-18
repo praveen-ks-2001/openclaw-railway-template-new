@@ -1,6 +1,7 @@
 {
   "name": "openclaw-railway-template",
   "private": true,
+  "openclawVersion": "2026.10.4",
   "type": "module",
   "packageManager": "pnpm@10.12.4",
   "engines": {

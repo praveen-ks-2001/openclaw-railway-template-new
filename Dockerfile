@@ -32,10 +32,8 @@ ENV HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
 ENV HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
 ENV HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
 
-# Pin the OpenClaw release targeted by this wrapper; container verification is separate.
-# entrypoint.sh installs openclaw@${OPENCLAW_VERSION} at boot; override in Railway
-# Variables to deploy a different version without rebuilding the image.
-ENV OPENCLAW_VERSION=2026.10.4
+# entrypoint.sh installs the exact release pinned in this branch's package.json.
+# Railway environment variables cannot select a different OpenClaw version.
 ENV PORT=8080
 ENV OPENCLAW_STATE_DIR=/data/.openclaw
 ENV OPENCLAW_WORKSPACE_DIR=/data/workspace

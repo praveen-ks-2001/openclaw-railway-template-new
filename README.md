@@ -48,9 +48,11 @@ For Telegram or Discord, message your bot. If it replies with a pairing code, go
 
 ### Upgrading an Existing Installation
 
-This template targets **OpenClaw 2026.10.4**. Keep your existing persistent volume mounted at `/data` when redeploying. The template migrates existing configuration and state during startup; allow the health check to complete before opening the UI. Older `OPENCLAW_VERSION` overrides are raised to this minimum supported version.
+This branch pins **OpenClaw 2026.10.4** in `package.json`. Railway version variables, including an existing `OPENCLAW_VERSION`, are ignored. Keep your existing persistent volume mounted at `/data` when redeploying. The template migrates existing configuration and state during startup; allow the health check to complete before opening the UI.
 
 Existing users do not need to run setup again. Use `/setup` → **Open OpenClaw UI** after the upgrade. Existing browser approvals are retained; a new browser or an import into another deployment may require pairing. Use **Export Data** first if you want a manual backup. **Reset configuration** and **Wipe all data** are not steps in an ordinary upgrade.
+
+To change OpenClaw versions, select the corresponding release branch in Railway. Downgrading an already-migrated installation also requires a compatible pre-upgrade data backup; selecting an older branch does not reverse database changes. That backup will not include subsequent chats or edits.
 
 ---
 
