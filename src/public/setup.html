@@ -279,8 +279,8 @@
           //   URL: https://auth.openai.com/codex/device
           //   Code: MPON-M64WT
           // Prefer the URL after a "URL:" label; fall back to known auth hosts.
-          const urlByLabel = text.match(/\bURL:\s*(https:\/\/[^\s)\]│]+)/i);
-          const urlByHost = text.match(/https:\/\/(?:auth\.openai\.com|chatgpt\.com|chat\.openai\.com|[a-z0-9.]*x\.ai|[a-z0-9.]*grok\.com)\/[^\s)\]│]*/i);
+          const urlByLabel = text.match(/\bURL:\s*<?(https:\/\/[^\s<>\)\]│]+)/i);
+          const urlByHost = text.match(/https:\/\/(?:auth\.openai\.com|chatgpt\.com|chat\.openai\.com|[a-z0-9.]*x\.ai|[a-z0-9.]*grok\.com)\/[^\s<>\)\]│]*/i);
           const url = (urlByLabel && urlByLabel[1]) || (urlByHost && urlByHost[0]);
           if (url) this.loginUrl = url;
           // Require the "Code:"/"User code:" label WITH a colon and match an
@@ -434,13 +434,11 @@
           this.importInfo = '';
           this.importPhase = 'probing';
           try {
-            const url = '/setup/api/import/probe' + (this.importZipPassword
-              ? ('?password=' + encodeURIComponent(this.importZipPassword))
-              : '');
+            const url = '/setup/api/import/probe';
             const res = await fetch(url, {
               method: 'POST',
               credentials: 'same-origin',
-              headers: { 'content-type': 'application/zip' },
+              headers: { 'content-type': 'application/zip', ...(this.importZipPassword ? { 'X-Archive-Password': btoa(unescape(encodeURIComponent(this.importZipPassword))) } : {}) },
               body: this.importFile,
             });
             let payload = null;
@@ -686,7 +684,7 @@
               <li class="flex items-start gap-3">
                 <span class="step-num">1</span>
                 <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Select your <strong
-                    class="text-[var(--color-text-primary)]">provider & auth type</strong>, then paste your API key</p>
+                    class="text-[var(--color-text-primary)]">provider & auth type</strong>, then enter an API key if requested</p>
               </li>
               <li class="flex items-start gap-3">
                 <span class="step-num">2</span>
@@ -701,56 +699,56 @@
               <li class="flex items-start gap-3">
                 <span class="step-num">4</span>
                 <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Click <strong
-                    class="text-[var(--color-text-primary)]">Copy Gateway Token</strong></p>
+                    class="text-[var(--color-text-primary)]">Open OpenClaw UI</strong> and wait for it to finish starting</p>
               </li>
               <li class="flex items-start gap-3">
                 <span class="step-num">5</span>
-                <p class="text-[13px] text-[var(--color-text-primary)] leading-relaxed">Click <strong
-                    class="text-[var(--color-text-primary)]">Open OpenClaw UI</strong></p>
+                <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">If asked for a <strong
+                    class="text-[var(--color-text-primary)]">Gateway secret</strong>, use <strong
+                    class="text-[var(--color-text-primary)]">Copy Gateway Token</strong> here, paste it there, and click <strong
+                    class="text-[var(--color-text-primary)]">Connect</strong></p>
               </li>
               <li class="flex items-start gap-3">
                 <span class="step-num">6</span>
                 <div class="relative">
-                  <span class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">The
-                    <strong class="text-[var(--color-text-primary)]">Gateway Token</strong> is usually filled in
-                    automatically. If it's empty in <strong class="text-[var(--color-text-primary)]">Overview</strong>,
-                    paste the copied token there.</span>
+                  <span class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">See
+                    <strong class="text-[var(--color-text-primary)]">Approve this browser</strong> or a pairing command?
+                    Keep that tab open, then return here to <strong class="text-[var(--color-text-primary)]">Pair Devices</strong>
+                    → <strong class="text-[var(--color-text-primary)]">Approve</strong> the matching request.</span>
                   <div class="info-tooltip inline-flex ml-1 relative mt-[1px]">i
-                    <div class="info-tooltip-content" style="top: -10px; left: 24px; width: 260px;">The wrapper injects
-                      the token automatically on most builds. Only paste it manually under Overview → Gateway Token if
-                      that field is empty when the OpenClaw UI loads.</div>
+                    <div class="info-tooltip-content" style="top: -10px; left: 24px; width: 260px;">Match the request ID
+                      shown in OpenClaw. You can approve it here without running the displayed terminal command.</div>
                   </div>
                 </div>
               </li>
               <li class="flex items-start gap-3">
                 <span class="step-num">7</span>
                 <div class="relative">
-                  <span class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Go to
-                    <strong class="text-[var(--color-text-primary)]">Pair Devices</strong> → <strong
-                      class="text-[var(--color-text-primary)]">Approve</strong> the pairing request</span>
+                  <span class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Return to OpenClaw.
+                    It connects automatically after approval; use <strong
+                      class="text-[var(--color-text-primary)]">Check now</strong> if needed.</span>
                   <div class="info-tooltip inline-flex ml-1 relative mt-[1px]">i
-                    <div class="info-tooltip-content" style="top: -24px; left: 24px; width: 260px;">New browsers need a
-                      one-time device approval. After opening the OpenClaw UI, go to Pair Devices and approve the pending request.</div>
+                    <div class="info-tooltip-content" style="top: -24px; left: 24px; width: 260px;">Approval is remembered
+                      in this browser. A new browser or private window may need its own approval.</div>
                   </div>
                 </div>
               </li>
               <li class="flex items-start gap-3">
                 <span class="step-num">8</span>
                 <div class="relative">
-                  <span class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">If you added a channel
-                    token, click <strong class="text-[var(--color-text-primary)]">Approve Channel Access</strong> and enter the
-                    code</span>
+                  <span class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">If your Telegram or Discord
+                    bot sends a pairing code, click <strong class="text-[var(--color-text-primary)]">Approve Channel Access</strong>
+                    here and enter it.</span>
                   <div class="info-tooltip inline-flex ml-1 relative mt-[1px]">i
-                    <div class="info-tooltip-content" style="top: -10px; left: 24px; width: 260px;">After setup, message
-                      your bot on the channel (e.g. send "hey"). It will reply with a pairing code. Enter that code here
-                      to grant DM access. If no code appears, try restarting the bot.</div>
+                    <div class="info-tooltip-content" style="top: -10px; left: 24px; width: 260px;">Message your bot first.
+                      If it asks for pairing, enter the code from its reply here. Channel access is separate from browser approval.</div>
                   </div>
                 </div>
               </li>
               <li class="flex items-start gap-3">
                 <span class="step-num">9</span>
-                <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">You should now see
-                  <strong class="text-[var(--color-text-primary)]">Health: OK</strong> in the OpenClaw UI
+                <p class="text-[13px] text-[var(--color-text-secondary)] leading-relaxed">Once OpenClaw shows
+                  <strong class="text-[var(--color-text-primary)]">Connected</strong>, start chatting
                 </p>
               </li>
             </ol>
@@ -759,7 +757,7 @@
           <div class="mt-4 p-3 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30">
             <p class="text-[11px] uppercase tracking-widest text-[var(--color-warning)] font-semibold mb-1.5">Heads up</p>
             <p class="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
-              This template is pinned to OpenClaw <strong class="text-[var(--color-text-primary)]">2026.6.6</strong>. To run a different release, set <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code> in your Railway env vars (overrides the Dockerfile default).
+              This template is pinned to OpenClaw <strong class="text-[var(--color-text-primary)]">2026.10.4</strong>. To run a different release, set <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code> in your Railway env vars (overrides the Dockerfile default).
             </p>
           </div>
 
@@ -1079,8 +1077,8 @@
                       </div>
                       <div>
                         <h2 class="text-lg font-semibold">Setup Complete</h2>
-                        <p class="text-sm text-[var(--color-text-secondary)]">Your OpenClaw instance is configured and
-                          running</p>
+                        <p class="text-sm text-[var(--color-text-secondary)]">Your configuration is saved. Open OpenClaw UI
+                          to connect this browser.</p>
                       </div>
                     </div>
                   </section>
@@ -1095,7 +1093,7 @@
                       </div>
                       <div>
                         <h3 class="text-base font-semibold">Gateway Token</h3>
-                        <p class="text-xs text-[var(--color-text-secondary)]">Required to connect the OpenClaw UI</p>
+                        <p class="text-xs text-[var(--color-text-secondary)]">Copy this if OpenClaw asks for a Gateway secret</p>
                       </div>
                     </div>
                     <button
@@ -1109,10 +1107,13 @@
                     <div class="bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3">
                       <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed">
                         <strong class="text-[var(--color-warning)]">Next step:</strong>
-                        Open the OpenClaw UI below, then go to <strong class="text-[var(--color-text-primary)]">Overview</strong>
-                        and paste this token in the <strong class="text-[var(--color-text-primary)]">Gateway Token</strong> field.
-                        After that, go to <strong class="text-[var(--color-text-primary)]">Pair Devices</strong> and
-                        approve the pairing request.
+                        Open the OpenClaw UI below. If asked for a <strong class="text-[var(--color-text-primary)]">Gateway secret</strong>,
+                        paste this token and click <strong class="text-[var(--color-text-primary)]">Connect</strong>.
+                      </p>
+                      <p class="text-xs text-[var(--color-text-secondary)] leading-relaxed mt-2">
+                        If you see <strong class="text-[var(--color-text-primary)]">Approve this browser</strong> or a pairing command,
+                        keep that tab open. Return here to <strong class="text-[var(--color-text-primary)]">Pair Devices</strong>
+                        and approve the matching request. Then return to OpenClaw; use <strong class="text-[var(--color-text-primary)]">Check now</strong> if needed.
                       </p>
                     </div>
                   </section>
@@ -1270,8 +1271,9 @@
             </button>
           </div>
         </div>
-        <p class="text-sm text-[var(--color-text-secondary)] mb-4">When a new browser connects to the Control UI, it
-          requires a one-time pairing approval.</p>
+        <p class="text-sm text-[var(--color-text-secondary)] mb-4">Keep the OpenClaw tab open. When it shows
+          <strong class="text-[var(--color-text-primary)]">Approve this browser</strong>, approve the request with the same ID below.
+          Then return to OpenClaw; it connects automatically, or you can click <strong class="text-[var(--color-text-primary)]">Check now</strong>.</p>
         <button @click="approveDevice()" :disabled="devicesLoading" class="btn btn-primary w-full mb-4">
           <span x-show="!devicesLoading">Approve Latest Request</span>
           <span x-show="devicesLoading" class="flex items-center gap-2">
@@ -1287,17 +1289,17 @@
               Requests</h4>
             <div x-show="devicesPending.length === 0 && !devicesLoading"
               class="text-sm text-[var(--color-text-muted)] bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border-muted)]">
-              No pending requests</div>
+              No pending requests. If you're pairing a new browser, connect in the OpenClaw tab first, then refresh this list.</div>
             <div class="space-y-2">
               <template x-for="req in devicesPending" :key="req.requestId || req.id">
                 <div
-                  class="flex items-center justify-between bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3">
+                  class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-[var(--color-surface)] border border-[var(--color-border-muted)] rounded-lg p-3">
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium truncate" x-text="req.requestId || req.id"></p>
+                    <p class="text-sm font-medium break-all" x-text="req.requestId || req.id"></p>
                     <p x-show="req.createdAt" class="text-xs text-[var(--color-text-muted)]"
                       x-text="req.createdAt ? new Date(req.createdAt).toLocaleString() : ''"></p>
                   </div>
-                  <div class="flex gap-2 ml-3 shrink-0">
+                  <div class="flex gap-2 shrink-0">
                     <button @click="approveDevice(req.requestId || req.id)" :disabled="devicesLoading"
                       class="btn btn-success !py-1 !px-3 text-xs">Approve</button>
                     <button @click="rejectDevice(req.requestId || req.id)" :disabled="devicesLoading"
@@ -1526,7 +1528,7 @@
               </div>
               <div class="flex justify-between">
                 <dt class="text-[var(--color-text-secondary)]">Chat sessions</dt>
-                <dd class="text-[var(--color-text-primary)] font-medium" x-text="(importManifest?.sessionCount ?? 0) + ' file' + ((importManifest?.sessionCount ?? 0) === 1 ? '' : 's')"></dd>
+                <dd class="text-[var(--color-text-primary)] font-medium" x-text="(importManifest?.sessionCount ?? 0) + ' session' + ((importManifest?.sessionCount ?? 0) === 1 ? '' : 's')"></dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-[var(--color-text-secondary)]">Workspace</dt>

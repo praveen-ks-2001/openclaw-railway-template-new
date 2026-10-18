@@ -1,4 +1,4 @@
-FROM node:24-bookworm
+FROM node:24.16.0-bookworm
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -7,6 +7,7 @@ RUN apt-get update \
     git \
     gosu \
     procps \
+    tini \
     python3 \
     build-essential \
     zip \
@@ -17,11 +18,6 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate && pnpm install --frozen-lockfile --prod
-
-COPY src ./src
-COPY entrypoint.sh ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
-
 
 RUN useradd -m -s /bin/bash openclaw \
   && chown -R openclaw:openclaw /app \
@@ -36,16 +32,23 @@ ENV HOMEBREW_PREFIX="/home/linuxbrew/.linuxbrew"
 ENV HOMEBREW_CELLAR="/home/linuxbrew/.linuxbrew/Cellar"
 ENV HOMEBREW_REPOSITORY="/home/linuxbrew/.linuxbrew/Homebrew"
 
-# Pin the OpenClaw version this template is verified against (latest stable: 2026.6.6).
+# Pin the OpenClaw release targeted by this wrapper; container verification is separate.
 # entrypoint.sh installs openclaw@${OPENCLAW_VERSION} at boot; override in Railway
 # Variables to deploy a different version without rebuilding the image.
-ENV OPENCLAW_VERSION=2026.6.6
+ENV OPENCLAW_VERSION=2026.10.4
 ENV PORT=8080
+ENV OPENCLAW_STATE_DIR=/data/.openclaw
+ENV OPENCLAW_WORKSPACE_DIR=/data/workspace
+ENV OPENCLAW_SERVICE_REPAIR_POLICY=external
 ENV OPENCLAW_ENTRY=/usr/local/lib/node_modules/openclaw/dist/entry.js
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD curl -f http://localhost:8080/setup/healthz || exit 1
+  CMD curl -f "http://localhost:${PORT}/setup/healthz" || exit 1
 
 USER root
-ENTRYPOINT ["./entrypoint.sh"]
+COPY --chown=openclaw:openclaw src ./src
+COPY --chown=openclaw:openclaw scripts ./scripts
+COPY --chown=openclaw:openclaw --chmod=755 entrypoint.sh ./entrypoint.sh
+ENV OPENCLAW_SUPERVISOR_MODE=external
+ENTRYPOINT ["tini", "--", "./entrypoint.sh"]
