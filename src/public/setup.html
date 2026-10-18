@@ -757,7 +757,8 @@
           <div class="mt-4 p-3 rounded-lg bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/30">
             <p class="text-[11px] uppercase tracking-widest text-[var(--color-warning)] font-semibold mb-1.5">Heads up</p>
             <p class="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
-              This template is pinned to OpenClaw <strong class="text-[var(--color-text-primary)]">2026.10.4</strong>. To run a different release, set <code class="text-[11px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code> in your Railway env vars (overrides the Dockerfile default).
+              This branch runs OpenClaw <strong class="text-[var(--color-text-primary)]" x-text="versionInfo?.pinned || '…'"></strong>.
+              The version is fixed by the branch; Railway version variables are ignored. Choose a different release branch to change versions.
             </p>
           </div>
 
@@ -792,32 +793,6 @@
       <!-- MAIN CONTENT AREA -->
       <main class="flex-1 w-full max-w-3xl">
         <div class="px-6 space-y-8">
-
-          <!-- Version compatibility bump notice -->
-          <div x-show="versionInfo && versionInfo.bumped" x-cloak
-            class="bg-[var(--color-warning)]/10 border border-[var(--color-warning)]/40 rounded-lg p-4 flex items-start gap-3">
-            <svg class="w-5 h-5 text-[var(--color-warning)] shrink-0 mt-0.5" fill="none" stroke="currentColor"
-              viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <div class="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-              <p class="font-semibold text-[var(--color-text-primary)] mb-1">OpenClaw version auto-bumped for
-                compatibility</p>
-              <p>You requested <code
-                  class="text-[12px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]"
-                  x-text="versionInfo && versionInfo.requested"></code>, but this template requires at least
-                <code
-                  class="text-[12px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]"
-                  x-text="versionInfo && versionInfo.minimum"></code>, so it was started on
-                <code
-                  class="text-[12px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]"
-                  x-text="versionInfo && versionInfo.effective"></code>.
-                To run a newer version, set <code
-                  class="text-[12px] bg-[var(--color-surface-overlay)] px-1 py-0.5 rounded text-[var(--color-text-primary)]">OPENCLAW_VERSION</code>
-                (≥ <span x-text="versionInfo && versionInfo.minimum"></span>) in your Railway Variables.</p>
-            </div>
-          </div>
 
           <!-- ===================== PRE-SETUP VIEW ===================== -->
           <template x-if="isReady && !configured">

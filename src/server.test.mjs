@@ -61,6 +61,8 @@ async function fixture(
     pairingApprovalDelayMs = 0,
     tuiIdleTimeoutMs = 300_000,
     tuiMaxSessionMs = 1_800_000,
+    versionEnvironment = {},
+    packageVersion = "2026.10.4",
     prepareState = async () => {},
   } = {},
 ) {
@@ -107,7 +109,7 @@ async function fixture(
     path.join(root, "openclaw", "package.json"),
     JSON.stringify({
       name: "openclaw",
-      version: "2026.10.4",
+      version: packageVersion,
       type: "module",
       exports: {
         "./plugin-sdk/device-bootstrap":
@@ -289,6 +291,7 @@ async function fixture(
   const [wrapperPort, gatewayPort] = reservations.map(({ port }) => port);
   await Promise.all(reservations.map(({ close }) => close()));
   const wrapperEnv = {
+      ...versionEnvironment,
       PATH: process.env.PATH,
       HOME: path.join(root, "home"),
       TMPDIR: root,
@@ -430,6 +433,34 @@ async function firstMessage(client) {
     clearTimeout(timeout);
   }
 }
+
+test("status reports the branch pin and installed package instead of version environment overrides", async (t) => {
+  const f = await fixture(t, { versionEnvironment: {
+    OPENCLAW_VERSION: "2099.1.1",
+    OPENCLAW_REQUESTED_VERSION: "2026.6.6",
+    OPENCLAW_EFFECTIVE_VERSION: "spoofed-release",
+    OPENCLAW_MINIMUM_VERSION: "1900.1.1",
+    OPENCLAW_VERSION_BUMPED: "true",
+  } });
+  const response = await f.authorized("/setup/api/status");
+  assert.equal(response.status, 200);
+  const status = await response.json();
+  assert.deepEqual(status.versionInfo, {
+    pinned: "2026.10.4", effective: "2026.10.4", source: "branch",
+    requested: null, minimum: "2026.10.4", bumped: false,
+  });
+});
+
+test("a mismatched installed release refuses startup before running OpenClaw commands", async (t) => {
+  let fixtureRoot;
+  await assert.rejects(fixture(t, {
+    configured: true,
+    packageVersion: "2026.6.6",
+    prepareState: async ({ root }) => { fixtureRoot = root; },
+  }), /does not match this branch's pinned release/);
+  assert.equal(JSON.parse(await fs.readFile(path.join(fixtureRoot, "state", "openclaw.json"), "utf8")).gateway.mode, "local");
+  await assert.rejects(fs.readFile(path.join(fixtureRoot, "events.ndjson")), { code: "ENOENT" });
+});
 
 test("unconfigured HTTP and WebSocket endpoints preserve authentication and validation contracts", async (t) => {
   const f = await fixture(t);
